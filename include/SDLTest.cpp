@@ -23,7 +23,8 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    SDL_Surface* surface = IMG_Load("test.png");
+    // 👉 这里已经改成 asset/image 路径
+    SDL_Surface* surface = IMG_Load("asset/image/siheyuan/pillar.png");
     if (!surface) {
         std::cerr << "IMG_Load failed: " << SDL_GetError() << std::endl;
         SDL_DestroyRenderer(renderer);

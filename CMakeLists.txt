@@ -1,5 +1,4 @@
 ﻿cmake_minimum_required(VERSION 3.16)
-
 project(SDLTest)
 
 if (POLICY CMP0141)
@@ -13,20 +12,24 @@ endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# 编译SDL3/SDL_image源码（保留你的原有逻辑）
 add_subdirectory(external/SDL)
-
 set(SDLIMAGE_VENDORED OFF CACHE BOOL "" FORCE)
 set(SDLIMAGE_SAMPLES OFF CACHE BOOL "" FORCE)
 set(SDLIMAGE_TESTS OFF CACHE BOOL "" FORCE)
-
 add_subdirectory(external/SDL_image)
 
+# 生成可执行文件
 add_executable(SDLTest
-   SDLTest.cpp
-   SDLTest.h
+   "include/SDLTest.cpp"
+   "src/SDLTest.h"
 )
 
+# 链接SDL3库
 target_link_libraries(SDLTest PRIVATE
     SDL3::SDL3
     SDL3_image::SDL3_image
 )
+
+# ========== 关键：删除所有复制DLL/asset的代码！ ==========
+# 完全跳过复制，只做编译链接

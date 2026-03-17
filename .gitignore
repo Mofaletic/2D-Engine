@@ -361,3 +361,20 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# C++编译产物
+*.exe
+*.o
+*.obj
+*.dll
+*.so
+*.dylib
+# IDE配置
+.vs/
+.idea/
+cmake-build-debug/
+# 临时文件
+*.tmp
+*.log
+# 资源文件（可选，若素材太大可不上传）
+assets/
