@@ -21,12 +21,38 @@ set(SDLIMAGE_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory(external/SDL_image)
 
 # 头文件目录
-include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/external/imgui
+)
 
 # 可执行程序
 add_executable(SDLTest
-    src/SDLTest.cpp
-)
+    main.cpp
+    Engine.cpp
+    WindowManager.cpp
+    Renderer2D.cpp
+    TextureManager.cpp
+    InputManager.cpp
+    GameLoop.cpp
+    ResourceManager.cpp
+    Sprite.cpp
+    
+    src/editor/EditorUI.cpp
+    src/editor/Panels/ScenePanel.cpp
+    src/editor/Panels/AssetPanel.cpp
+
+    # ImGui core
+    
+    
+    
+    
+
+    # SDL3 backend
+    
+    
+          "external/imgui/imgui.cpp" "external/imgui/imgui_demo.cpp" "external/imgui/imgui_draw.cpp" "external/imgui/imgui_tables.cpp" "external/imgui/imgui_widgets.cpp" "external/imgui/imgui.h" "external/imgui/imgui_internal.h" "external/imgui/backends/imgui_impl_sdl3.cpp" "external/imgui/backends/imgui_impl_sdl3.h" "external/imgui/backends/imgui_impl_sdlrenderer3.cpp" "external/imgui/backends/imgui_impl_sdlrenderer3.h" "external/imgui/imconfig.h")
 
 # 链接库
 target_link_libraries(SDLTest PRIVATE
