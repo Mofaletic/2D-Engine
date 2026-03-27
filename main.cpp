@@ -1,4 +1,5 @@
 #include "Engine.h"
+#include "editor/EditorUI.h"
 
 int main() {
     Engine engine;
