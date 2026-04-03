@@ -96,7 +96,8 @@ void Engine::run() {
         ImGui::NewFrame();
 
         // 3. 编辑器 UI
-        DrawEditorUI(sceneState, editorState);
+        renderer2D.clear();
+        DrawEditorUI(sceneState, editorState, renderer2D.getSceneRenderTarget());
 
         // 4. 处理编辑器命令（Play / Pause / Stop）
         handleEditorCommands();
@@ -105,7 +106,10 @@ void Engine::run() {
         gameLoop.update(sceneState, editorState);
 
         // 6. 渲染场景
-        renderer2D.clear();
+        renderer2D.resizeSceneRenderTarget(
+            static_cast<int>(editorState.sceneViewportWidth),
+            static_cast<int>(editorState.sceneViewportHeight)
+        );
         renderer2D.renderScene(sceneState, resourceManager);
 
         // 7. 渲染 ImGui

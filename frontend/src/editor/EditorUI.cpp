@@ -63,7 +63,7 @@ void DrawToolbarContent(EditorState& editorState)
 }
 
 // ================= 主界面 =================
-void DrawEditorUI(SceneState& sceneState, EditorState& editorState)
+void DrawEditorUI(SceneState& sceneState, EditorState& editorState, SDL_Texture* sceneTexture)
 {
     static bool dockspaceOpen = true;
     static bool layout_initialized = false;
@@ -138,7 +138,7 @@ void DrawEditorUI(SceneState& sceneState, EditorState& editorState)
 
     // ===== Panels =====
     DrawHierarchyPanel(sceneState, editorState);
-    DrawScenePanel(sceneState, editorState);
+    DrawScenePanel(sceneState, editorState, sceneTexture);
     DrawInspectorPanel(sceneState, editorState);
     DrawAssetPanel(sceneState, editorState);
     DrawConsolePanel();

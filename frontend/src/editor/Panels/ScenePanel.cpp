@@ -1,12 +1,14 @@
 #include "ScenePanel.h"
 #include "imgui.h"
 #include "../../../../backend/SceneSerializer.h"
+#include <algorithm>
+#include <cstdint>
 #include <cstring>
 
 static std::string sceneStatus = "No scene operation yet";
 static std::string sceneFilePath = "scene.json";
 
-void DrawScenePanel(SceneState& sceneState, EditorState& editorState)
+void DrawScenePanel(SceneState& sceneState, EditorState& editorState, SDL_Texture* sceneTexture)
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
@@ -32,6 +34,47 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState)
     }
 
     // ===== 简单操作按钮 =====
+    ImGui::Separator();
+    ImGui::Text("Viewport");
+
+    ImVec2 availableRegion = ImGui::GetContentRegionAvail();
+    float viewportHeight = std::max(180.0f, availableRegion.y * 0.45f);
+    ImVec2 viewportSize(availableRegion.x, viewportHeight);
+
+    editorState.sceneViewportWidth = viewportSize.x;
+    editorState.sceneViewportHeight = viewportSize.y;
+
+    ImGui::BeginChild("SceneViewport", viewportSize, true, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+
+    if (sceneTexture) {
+        float textureWidth = 1.0f;
+        float textureHeight = 1.0f;
+        if (!SDL_GetTextureSize(sceneTexture, &textureWidth, &textureHeight)) {
+            textureWidth = viewportSize.x;
+            textureHeight = viewportSize.y;
+        }
+
+        float scale = std::min(viewportSize.x / textureWidth, viewportSize.y / textureHeight);
+        scale = (scale > 0.0f) ? scale : 1.0f;
+
+        ImVec2 imageSize(textureWidth * scale, textureHeight * scale);
+        ImVec2 cursor = ImGui::GetCursorPos();
+        float offsetX = (viewportSize.x - imageSize.x) * 0.5f;
+        float offsetY = (viewportSize.y - imageSize.y) * 0.5f;
+        ImGui::SetCursorPos(ImVec2(cursor.x + std::max(0.0f, offsetX), cursor.y + std::max(0.0f, offsetY)));
+        ImGui::Image((ImTextureID)(intptr_t)sceneTexture, imageSize);
+    }
+    else {
+        ImVec2 childPos = ImGui::GetCursorScreenPos();
+        ImGui::GetWindowDrawList()->AddText(
+            ImVec2(childPos.x + 12.0f, childPos.y + 12.0f),
+            IM_COL32(220, 220, 220, 255),
+            "Scene viewport is initializing..."
+        );
+    }
+
+    ImGui::EndChild();
+
     ImGui::Separator();
 
     if (ImGui::Button("Reset Selected Position")) {
