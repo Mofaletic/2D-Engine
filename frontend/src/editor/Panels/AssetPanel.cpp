@@ -1,5 +1,6 @@
 #include "AssetPanel.h"
 #include "imgui.h"
+#include "../../../../backend/project/ProjectManager.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -154,6 +155,11 @@ void AssignAssetToSelection(SceneState& sceneState, EditorState& editorState, co
         return;
     }
 
+    if (asset.type != AssetType::Texture) {
+        editorState.assetStatus = "Only texture assets can be bound to scene objects";
+        return;
+    }
+
     sceneState.objects[index].textureResourceId = asset.id;
     sceneState.objects[index].texturePath = !asset.relativePath.empty() ? asset.relativePath : asset.sourcePath;
 }
@@ -166,6 +172,8 @@ void DrawAssetPanel(SceneState& sceneState, EditorState& editorState)
 
     static char filterBuffer[96] = "";
     static char projectNameBuffer[128] = "MyProject";
+    static char createItemNameBuffer[128] = "NewAsset";
+    static int createItemTypeIndex = 1;
     const bool hasProject = !editorState.projectRootPath.empty();
 
     ImGui::TextUnformatted("Project Assets");
@@ -209,6 +217,38 @@ void DrawAssetPanel(SceneState& sceneState, EditorState& editorState)
     }
 
     ImGui::Separator();
+
+    if (hasProject) {
+        const char* itemTypes[] = { "Audio", "Image", "Text", "Scene" };
+        ImGui::InputText("New Item Name", createItemNameBuffer, sizeof(createItemNameBuffer));
+        ImGui::Combo("New Item Type", &createItemTypeIndex, itemTypes, IM_ARRAYSIZE(itemTypes));
+        if (ImGui::Button("Create Item")) {
+            ProjectDescriptor project;
+            project.name = editorState.projectName;
+            project.rootPath = editorState.projectRootPath;
+            project.assetRootPath = editorState.assetRegistry.getProjectAssetRoot();
+            project.assetManifestPath = editorState.assetManifestPath;
+            project.defaultScenePath = editorState.sceneFilePath;
+            project.projectFilePath = editorState.projectFilePath;
+
+            ProjectItemType type = ProjectItemType::Image;
+            if (createItemTypeIndex == 0) type = ProjectItemType::Audio;
+            else if (createItemTypeIndex == 1) type = ProjectItemType::Image;
+            else if (createItemTypeIndex == 2) type = ProjectItemType::Text;
+            else if (createItemTypeIndex == 3) type = ProjectItemType::Scene;
+
+            std::string createdPath;
+            std::string error;
+            if (ProjectManager::CreateProjectItem(project, type, createItemNameBuffer, createdPath, error)) {
+                editorState.assetStatus = "Created project item: " + createdPath;
+                editorState.pendingProjectCommand = ProjectCommand::Sync;
+            }
+            else {
+                editorState.assetStatus = error.empty() ? "Failed to create project item" : error;
+            }
+        }
+        ImGui::Separator();
+    }
 
     int index = editorState.selectedObjectIndex;
     bool hasSelection = (index >= 0 && index < static_cast<int>(sceneState.objects.size()));

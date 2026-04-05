@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <vector>
 #include <system_error>
 
 namespace fs = std::filesystem;
@@ -53,6 +54,102 @@ bool WriteProjectFile(const fs::path& projectRoot, const std::string& projectNam
 
     file << data.dump(4);
     outError.clear();
+    return true;
+}
+
+std::string SanitizeName(std::string name) {
+    for (char& ch : name) {
+        const bool invalid =
+            ch == '<' || ch == '>' || ch == ':' || ch == '"' || ch == '/' ||
+            ch == '\\' || ch == '|' || ch == '?' || ch == '*';
+        if (invalid) {
+            ch = '_';
+        }
+    }
+
+    while (!name.empty() && (name.back() == '.' || name.back() == ' ')) {
+        name.pop_back();
+    }
+
+    return name;
+}
+
+fs::path BuildUniquePath(const fs::path& directory, const std::string& baseName, const std::string& extension) {
+    fs::path target = directory / ResourcePathUtils::Utf8ToPath(baseName + extension);
+    if (!fs::exists(target)) {
+        return target;
+    }
+
+    int suffix = 1;
+    while (true) {
+        fs::path candidate = directory / ResourcePathUtils::Utf8ToPath(baseName + "_" + std::to_string(suffix) + extension);
+        if (!fs::exists(candidate)) {
+            return candidate;
+        }
+        ++suffix;
+    }
+}
+
+bool WriteTextFile(const fs::path& targetPath, const std::string& content, std::string& outError) {
+    std::ofstream file(targetPath);
+    if (!file.is_open()) {
+        outError = "Failed to create file: " + Normalize(targetPath);
+        return false;
+    }
+    file << content;
+    outError.clear();
+    return true;
+}
+
+bool WriteBmpPlaceholder(const fs::path& targetPath, std::string& outError) {
+    const std::vector<unsigned char> bytes = {
+        0x42, 0x4D, 0x3A, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x36, 0x00, 0x00, 0x00, 0x28, 0x00,
+        0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00,
+        0x00, 0x00, 0x01, 0x00, 0x18, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x13, 0x0B,
+        0x00, 0x00, 0x13, 0x0B, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF,
+        0xFF, 0x00
+    };
+
+    std::ofstream file(targetPath, std::ios::binary);
+    if (!file.is_open()) {
+        outError = "Failed to create image file: " + Normalize(targetPath);
+        return false;
+    }
+
+    file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    outError.clear();
+    return true;
+}
+
+bool WriteSilentWav(const fs::path& targetPath, std::string& outError) {
+    const std::vector<unsigned char> bytes = {
+        'R','I','F','F', 0x24,0x00,0x00,0x00, 'W','A','V','E',
+        'f','m','t',' ', 0x10,0x00,0x00,0x00, 0x01,0x00,0x01,0x00,
+        0x44,0xAC,0x00,0x00, 0x88,0x58,0x01,0x00, 0x02,0x00,0x10,0x00,
+        'd','a','t','a', 0x00,0x00,0x00,0x00
+    };
+
+    std::ofstream file(targetPath, std::ios::binary);
+    if (!file.is_open()) {
+        outError = "Failed to create audio file: " + Normalize(targetPath);
+        return false;
+    }
+
+    file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    outError.clear();
+    return true;
+}
+
+bool EnsureDirectory(const fs::path& path, std::string& outError) {
+    std::error_code ec;
+    fs::create_directories(path, ec);
+    if (ec) {
+        outError = "Failed to create directory: " + Normalize(path);
+        return false;
+    }
     return true;
 }
 
@@ -126,6 +223,65 @@ bool LoadProject(const std::string& projectDirectory, ProjectDescriptor& outProj
     }
 
     return BuildProjectDescriptor(projectRoot, outProject, outError);
+}
+
+bool CreateProjectItem(const ProjectDescriptor& project, ProjectItemType type, const std::string& itemName, std::string& outCreatedPath, std::string& outError) {
+    const std::string sanitizedName = SanitizeName(itemName.empty() ? "NewItem" : itemName);
+    if (sanitizedName.empty()) {
+        outError = "Item name cannot be empty.";
+        return false;
+    }
+
+    fs::path targetDirectory;
+    std::string extension;
+    bool wroteFile = false;
+
+    switch (type) {
+    case ProjectItemType::Audio:
+        targetDirectory = ResourcePathUtils::Utf8ToPath(project.assetRootPath) / "Audio";
+        extension = ".wav";
+        break;
+    case ProjectItemType::Image:
+        targetDirectory = ResourcePathUtils::Utf8ToPath(project.assetRootPath) / "Images";
+        extension = ".bmp";
+        break;
+    case ProjectItemType::Text:
+        targetDirectory = ResourcePathUtils::Utf8ToPath(project.assetRootPath) / "Text";
+        extension = ".txt";
+        break;
+    case ProjectItemType::Scene:
+        targetDirectory = ResourcePathUtils::Utf8ToPath(project.assetRootPath) / "Scenes";
+        extension = ".scene.json";
+        break;
+    }
+
+    if (!EnsureDirectory(targetDirectory, outError)) {
+        return false;
+    }
+
+    const fs::path targetPath = BuildUniquePath(targetDirectory, sanitizedName, extension);
+    switch (type) {
+    case ProjectItemType::Audio:
+        wroteFile = WriteSilentWav(targetPath, outError);
+        break;
+    case ProjectItemType::Image:
+        wroteFile = WriteBmpPlaceholder(targetPath, outError);
+        break;
+    case ProjectItemType::Text:
+        wroteFile = WriteTextFile(targetPath, "New text asset\n", outError);
+        break;
+    case ProjectItemType::Scene:
+        wroteFile = WriteTextFile(targetPath, "{\n    \"sceneName\": \"" + sanitizedName + "\",\n    \"objects\": []\n}\n", outError);
+        break;
+    }
+
+    if (!wroteFile) {
+        return false;
+    }
+
+    outCreatedPath = Normalize(targetPath);
+    outError.clear();
+    return true;
 }
 
 }

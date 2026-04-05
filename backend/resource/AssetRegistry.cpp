@@ -115,10 +115,12 @@ std::size_t AssetRegistry::importFolderToProject(const std::string& folderPath) 
             continue;
         }
 
+        std::string filename = it->path().filename().string();
         std::string extension = it->path().extension().string();
         std::transform(extension.begin(), extension.end(), extension.begin(),
             [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        if (detectAssetType(extension) == AssetType::Unknown) {
+        const AssetType type = filename.ends_with(".scene.json") ? AssetType::Scene : detectAssetType(extension);
+        if (type == AssetType::Unknown) {
             continue;
         }
 
@@ -187,7 +189,11 @@ bool AssetRegistry::loadManifest(const std::string& manifestPath) {
             record.typeName = item.value("typeName", "Unknown");
             record.sourcePath = normalizePath(item.value("sourcePath", ""));
             record.relativePath = item.value("relativePath", "");
-            record.type = (record.typeName == "Texture") ? AssetType::Texture : AssetType::Unknown;
+            if (record.typeName == "Texture") record.type = AssetType::Texture;
+            else if (record.typeName == "Audio") record.type = AssetType::Audio;
+            else if (record.typeName == "Text") record.type = AssetType::Text;
+            else if (record.typeName == "Scene") record.type = AssetType::Scene;
+            else record.type = AssetType::Unknown;
 
             if (!record.sourcePath.empty()) {
                 assets_.push_back(record);
@@ -257,10 +263,12 @@ std::size_t AssetRegistry::rebuildFromProjectAssets() {
             continue;
         }
 
+        std::string filename = it->path().filename().string();
         std::string extension = it->path().extension().string();
         std::transform(extension.begin(), extension.end(), extension.begin(),
             [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        if (detectAssetType(extension) == AssetType::Unknown) {
+        const AssetType type = filename.ends_with(".scene.json") ? AssetType::Scene : detectAssetType(extension);
+        if (type == AssetType::Unknown) {
             continue;
         }
 
@@ -306,10 +314,12 @@ AssetSyncSummary AssetRegistry::synchronizeProjectAssets() {
             continue;
         }
 
+        std::string filename = it->path().filename().string();
         std::string extension = it->path().extension().string();
         std::transform(extension.begin(), extension.end(), extension.begin(),
             [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        if (detectAssetType(extension) == AssetType::Unknown) {
+        const AssetType type = filename.ends_with(".scene.json") ? AssetType::Scene : detectAssetType(extension);
+        if (type == AssetType::Unknown) {
             continue;
         }
 
@@ -405,6 +415,18 @@ AssetType AssetRegistry::detectAssetType(const std::string& extension) const {
         return AssetType::Texture;
     }
 
+    if (extension == ".wav" || extension == ".mp3" || extension == ".ogg") {
+        return AssetType::Audio;
+    }
+
+    if (extension == ".txt" || extension == ".json" || extension == ".md") {
+        return AssetType::Text;
+    }
+
+    if (extension == ".scene" || extension == ".scene.json") {
+        return AssetType::Scene;
+    }
+
     return AssetType::Unknown;
 }
 
@@ -443,10 +465,12 @@ std::string AssetRegistry::copyFileToProject(const std::string& sourceFilePath, 
         return {};
     }
 
+    std::string filename = sourcePath.filename().string();
     std::string extension = sourcePath.extension().string();
     std::transform(extension.begin(), extension.end(), extension.begin(),
         [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    if (detectAssetType(extension) == AssetType::Unknown) {
+    const AssetType sourceType = filename.ends_with(".scene.json") ? AssetType::Scene : detectAssetType(extension);
+    if (sourceType == AssetType::Unknown) {
         return {};
     }
 
@@ -504,11 +528,12 @@ std::uint64_t AssetRegistry::registerResolvedFile(const std::string& filePath) {
         return record.id;
     }
 
+    std::string filename = absolutePath.filename().string();
     std::string extension = absolutePath.extension().string();
     std::transform(extension.begin(), extension.end(), extension.begin(),
         [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
-    const AssetType type = detectAssetType(extension);
+    const AssetType type = filename.ends_with(".scene.json") ? AssetType::Scene : detectAssetType(extension);
     if (type == AssetType::Unknown) {
         return 0;
     }
@@ -554,6 +579,12 @@ std::string AssetRegistry::assetTypeToString(AssetType type) {
     switch (type) {
     case AssetType::Texture:
         return "Texture";
+    case AssetType::Audio:
+        return "Audio";
+    case AssetType::Text:
+        return "Text";
+    case AssetType::Scene:
+        return "Scene";
     case AssetType::Unknown:
     default:
         return "Unknown";

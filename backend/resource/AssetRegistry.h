@@ -7,7 +7,10 @@
 
 enum class AssetType {
     Unknown,
-    Texture
+    Texture,
+    Audio,
+    Text,
+    Scene
 };
 
 struct AssetRecord {
