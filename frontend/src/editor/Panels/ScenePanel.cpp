@@ -1,4 +1,4 @@
-﻿#include "ScenePanel.h"
+#include "ScenePanel.h"
 #include "imgui.h"
 #include "../../../../backend/SceneSerializer.h"
 #include <algorithm>
@@ -88,7 +88,6 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState, SDL_Textur
     if (editorState.mode == EditorMode::Play) modeText = "Play";
     else if (editorState.mode == EditorMode::Pause) modeText = "Pause";
 
-    // ===== 顶部状态 =====
     ImGui::TextUnformatted("Scene Overview");
     ImGui::Separator();
 

@@ -1,4 +1,4 @@
-﻿#include "Engine.h"
+#include "Engine.h"
 #include <iostream>
 #include "../../frontend/src/editor/EditorUI.h"
 #include <SDL3/SDL.h>
@@ -34,7 +34,6 @@ bool Engine::init() {
         ? "Project asset library ready"
         : "No registered project assets yet";
 
-    // ✅ 初始化 ImGui
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
     SetupEditorStyle();
@@ -43,7 +42,6 @@ bool Engine::init() {
     ImGui_ImplSDL3_InitForSDLRenderer(windowManager.getWindow(), renderer2D.getRenderer());
     ImGui_ImplSDLRenderer3_Init(renderer2D.getRenderer());
 
-    // 初始化场景数据
     const AssetRecord* defaultTexture = editorState.assetRegistry.findByPath("pillar.png");
     const std::uint64_t defaultTextureId = defaultTexture ? defaultTexture->id : 0;
     const std::string defaultTexturePath =
@@ -103,40 +101,29 @@ void Engine::handleEditorCommands()
 
 void Engine::run() {
     while (running) {
-        // 1. 输入
         inputManager.processEvents(windowManager);
         if (inputManager.shouldQuit()) {
             running = false;
         }
 
-        // 2. 开始 ImGui 帧
-
         ImGui_ImplSDL3_NewFrame();
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui::NewFrame();
 
-        // 3. 编辑器 UI
         renderer2D.clear();
         DrawEditorUI(sceneState, editorState, renderer2D.getSceneRenderTarget());
 
-        // 4. 处理编辑器命令（Play / Pause / Stop）
         handleEditorCommands();
-
-        // 5. 逻辑更新
         gameLoop.update(sceneState, editorState);
 
-        // 6. 渲染场景
         renderer2D.resizeSceneRenderTarget(
             static_cast<int>(editorState.sceneViewportWidth),
             static_cast<int>(editorState.sceneViewportHeight)
         );
         renderer2D.renderScene(sceneState, resourceManager);
 
-        // 7. 渲染 ImGui
         ImGui::Render();
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer2D.getRenderer());
-
-        // 8. 提交画面
         renderer2D.present();
     }
 }
