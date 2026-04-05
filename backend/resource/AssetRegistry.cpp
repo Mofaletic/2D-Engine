@@ -272,6 +272,91 @@ std::size_t AssetRegistry::rebuildFromProjectAssets() {
     return importedCount;
 }
 
+AssetSyncSummary AssetRegistry::synchronizeProjectAssets() {
+    AssetSyncSummary summary;
+    lastError_.clear();
+
+    const std::string root = normalizePath(projectAssetRoot_);
+    std::error_code ec;
+    if (!fs::exists(root, ec) || !fs::is_directory(root, ec)) {
+        if (!assets_.empty()) {
+            summary.removedAssets = assets_;
+            summary.removedCount = assets_.size();
+            assets_.clear();
+            rebuildIndexes();
+        }
+        return summary;
+    }
+
+    std::vector<std::string> discoveredFiles;
+    fs::recursive_directory_iterator it(root, fs::directory_options::skip_permission_denied, ec);
+    fs::recursive_directory_iterator end;
+    if (ec) {
+        lastError_ = "Failed to sync project assets: " + root;
+        return summary;
+    }
+
+    for (; it != end; it.increment(ec)) {
+        if (ec) {
+            ec.clear();
+            continue;
+        }
+
+        if (!it->is_regular_file(ec)) {
+            continue;
+        }
+
+        std::string extension = it->path().extension().string();
+        std::transform(extension.begin(), extension.end(), extension.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        if (detectAssetType(extension) == AssetType::Unknown) {
+            continue;
+        }
+
+        discoveredFiles.push_back(normalizePath(it->path().string()));
+    }
+
+    std::sort(discoveredFiles.begin(), discoveredFiles.end());
+    discoveredFiles.erase(std::unique(discoveredFiles.begin(), discoveredFiles.end()), discoveredFiles.end());
+
+    std::unordered_map<std::string, bool> discoveredLookup;
+    discoveredLookup.reserve(discoveredFiles.size());
+    for (const std::string& file : discoveredFiles) {
+        discoveredLookup[file] = true;
+    }
+
+    std::vector<AssetRecord> keptAssets;
+    keptAssets.reserve(assets_.size());
+    for (const AssetRecord& asset : assets_) {
+        if (!discoveredLookup.contains(asset.sourcePath)) {
+            summary.removedAssets.push_back(asset);
+            ++summary.removedCount;
+            continue;
+        }
+
+        AssetRecord updated = asset;
+        const fs::path assetPath = ResourcePathUtils::Utf8ToPath(asset.sourcePath);
+        updated.name = assetPath.filename().string();
+        updated.relativePath = buildProjectRelativePath(asset.sourcePath);
+        keptAssets.push_back(std::move(updated));
+    }
+
+    assets_ = std::move(keptAssets);
+    rebuildIndexes();
+
+    for (const std::string& file : discoveredFiles) {
+        if (pathToIndex_.contains(file)) {
+            continue;
+        }
+
+        if (registerResolvedFile(file) != 0) {
+            ++summary.addedCount;
+        }
+    }
+
+    return summary;
+}
+
 const std::vector<AssetRecord>& AssetRegistry::getAssets() const {
     return assets_;
 }

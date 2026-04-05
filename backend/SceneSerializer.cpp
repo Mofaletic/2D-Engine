@@ -1,5 +1,6 @@
 #include "SceneSerializer.h"
 #include <nlohmann/json.hpp>
+#include <filesystem>
 #include <fstream>
 
 using json = nlohmann::json;
@@ -22,7 +23,13 @@ bool SaveSceneToFile(const SceneState& sceneState, const std::string& sceneName,
         j["objects"].push_back(objJson);
     }
 
-    std::ofstream file(path);
+    std::filesystem::path outputPath(path);
+    std::error_code ec;
+    if (outputPath.has_parent_path()) {
+        std::filesystem::create_directories(outputPath.parent_path(), ec);
+    }
+
+    std::ofstream file(outputPath);
     if (!file.is_open()) {
         return false;
     }

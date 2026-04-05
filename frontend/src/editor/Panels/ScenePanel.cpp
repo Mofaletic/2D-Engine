@@ -1,4 +1,4 @@
-﻿#include "ScenePanel.h"
+#include "ScenePanel.h"
 #include "imgui.h"
 #include "../../../../backend/SceneSerializer.h"
 #include <algorithm>
@@ -6,7 +6,6 @@
 #include <cstring>
 
 static std::string sceneStatus = "No scene operation yet";
-static std::string sceneFilePath = "scene.json";
 
 namespace {
 
@@ -88,7 +87,6 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState, SDL_Textur
     if (editorState.mode == EditorMode::Play) modeText = "Play";
     else if (editorState.mode == EditorMode::Pause) modeText = "Pause";
 
-    // ===== 顶部状态 =====
     ImGui::TextUnformatted("Scene Overview");
     ImGui::Separator();
 
@@ -155,14 +153,19 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState, SDL_Textur
     ImGui::Spacing();
 
     static char sceneNameBuffer[128] = "TestScene";
+    const bool hasProject = !editorState.sceneFilePath.empty();
 
     ImGui::InputText("Scene Name", sceneNameBuffer, sizeof(sceneNameBuffer));
 
     const float sceneToolsWidth = ImGui::GetContentRegionAvail().x;
     const bool stackSceneButtons = sceneToolsWidth < 520.0f;
 
+    if (!hasProject) {
+        ImGui::BeginDisabled();
+    }
+
     if (ImGui::Button("Save Scene")) {
-        if (SaveSceneToFile(sceneState, sceneNameBuffer, sceneFilePath)) {
+        if (SaveSceneToFile(sceneState, sceneNameBuffer, editorState.sceneFilePath)) {
             sceneStatus = "Scene saved successfully";
         }
         else {
@@ -176,7 +179,7 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState, SDL_Textur
 
     if (ImGui::Button("Load Scene")) {
         std::string loadedSceneName;
-        if (LoadSceneFromFile(sceneState, editorState, loadedSceneName, sceneFilePath)) {
+        if (LoadSceneFromFile(sceneState, editorState, loadedSceneName, editorState.sceneFilePath)) {
             strncpy(sceneNameBuffer, loadedSceneName.c_str(), sizeof(sceneNameBuffer));
             sceneNameBuffer[sizeof(sceneNameBuffer) - 1] = '\0';
             sceneStatus = "Scene loaded successfully";
@@ -185,7 +188,15 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState, SDL_Textur
             sceneStatus = "Failed to load scene";
         }
     }
-    ImGui::TextWrapped("Scene File: %s", sceneFilePath.c_str());
+
+    if (!hasProject) {
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("Scene File: No project scene file yet");
+        ImGui::TextWrapped("Create or open a project before saving the scene.");
+    }
+    else {
+        ImGui::TextWrapped("Scene File: %s", editorState.sceneFilePath.c_str());
+    }
     ImGui::TextWrapped("Status: %s", sceneStatus.c_str());
 
     ImGui::Separator();

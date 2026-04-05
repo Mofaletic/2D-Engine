@@ -19,6 +19,12 @@ struct AssetRecord {
     std::string relativePath;
 };
 
+struct AssetSyncSummary {
+    std::size_t addedCount = 0;
+    std::size_t removedCount = 0;
+    std::vector<AssetRecord> removedAssets;
+};
+
 class AssetRegistry {
 public:
     AssetRegistry();
@@ -34,6 +40,7 @@ public:
     bool loadManifest(const std::string& manifestPath);
     bool saveManifest(const std::string& manifestPath) const;
     std::size_t rebuildFromProjectAssets();
+    AssetSyncSummary synchronizeProjectAssets();
 
     const std::vector<AssetRecord>& getAssets() const;
     const AssetRecord* findById(std::uint64_t id) const;

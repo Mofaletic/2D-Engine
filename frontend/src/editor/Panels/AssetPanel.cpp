@@ -165,9 +165,49 @@ void DrawAssetPanel(SceneState& sceneState, EditorState& editorState)
     ImGui::Begin("Project");
 
     static char filterBuffer[96] = "";
+    static char projectNameBuffer[128] = "MyProject";
+    const bool hasProject = !editorState.projectRootPath.empty();
 
     ImGui::TextUnformatted("Project Assets");
-    ImGui::TextWrapped("Import textures into the project library, then bind a registered resource to the selected object.");
+    ImGui::TextWrapped("Create or open a project folder, import textures into the project library, and keep editor state synced with disk.");
+    ImGui::Separator();
+
+    ImGui::InputText("Project Name", projectNameBuffer, sizeof(projectNameBuffer));
+
+    if (ImGui::Button("New Project")) {
+        std::string folderPath;
+        if (PickFolderFromNativeDialog(folderPath)) {
+            editorState.pendingProjectName = projectNameBuffer;
+            editorState.pendingProjectDirectory = folderPath;
+            editorState.pendingProjectCommand = ProjectCommand::Create;
+        }
+        else {
+            editorState.projectStatus = "Project creation canceled";
+        }
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Open Project")) {
+        std::string folderPath;
+        if (PickFolderFromNativeDialog(folderPath)) {
+            editorState.pendingProjectDirectory = folderPath;
+            editorState.pendingProjectCommand = ProjectCommand::Open;
+        }
+        else {
+            editorState.projectStatus = "Open project canceled";
+        }
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("Sync Files")) {
+        editorState.pendingProjectCommand = ProjectCommand::Sync;
+    }
+
+    ImGui::TextWrapped("Project Status: %s", editorState.projectStatus.c_str());
+    if (hasProject) {
+        ImGui::TextWrapped("Project Root: %s", editorState.projectRootPath.c_str());
+    }
+
     ImGui::Separator();
 
     int index = editorState.selectedObjectIndex;
@@ -175,12 +215,16 @@ void DrawAssetPanel(SceneState& sceneState, EditorState& editorState)
     const float width = ImGui::GetContentRegionAvail().x;
     const bool compact = width < 760.0f;
 
+    if (!hasProject) {
+        ImGui::BeginDisabled();
+    }
+
     if (ImGui::Button("Import Images")) {
         const std::vector<std::string> filePaths = PickFilesFromNativeDialog();
         if (!filePaths.empty()) {
             const std::size_t importedCount = editorState.assetRegistry.importFilesToProject(filePaths);
             if (importedCount > 0) {
-                editorState.assetRegistry.saveManifest("asset/asset_registry.json");
+                editorState.assetRegistry.saveManifest(editorState.assetManifestPath);
                 editorState.assetStatus =
                     "Imported " + std::to_string(importedCount) + " image(s) into project assets";
             } else {
@@ -197,7 +241,7 @@ void DrawAssetPanel(SceneState& sceneState, EditorState& editorState)
         if (PickFolderFromNativeDialog(folderPath)) {
             const std::size_t importedCount = editorState.assetRegistry.importFolderToProject(folderPath);
             if (importedCount > 0) {
-                editorState.assetRegistry.saveManifest("asset/asset_registry.json");
+                editorState.assetRegistry.saveManifest(editorState.assetManifestPath);
                 editorState.assetStatus =
                     "Imported " + std::to_string(importedCount) + " asset(s) into project from " + folderPath;
             }
@@ -215,10 +259,13 @@ void DrawAssetPanel(SceneState& sceneState, EditorState& editorState)
 
     if (!compact) ImGui::SameLine();
     if (ImGui::Button("Refresh")) {
-        const std::size_t refreshedCount = editorState.assetRegistry.rebuildFromProjectAssets();
-        editorState.assetRegistry.saveManifest("asset/asset_registry.json");
-        editorState.assetStatus =
-            "Refreshed project asset library, found " + std::to_string(refreshedCount) + " importable file(s)";
+        editorState.pendingProjectCommand = ProjectCommand::Sync;
+        editorState.projectStatus = "Queued project asset sync";
+    }
+
+    if (!hasProject) {
+        ImGui::EndDisabled();
+        ImGui::TextWrapped("Import is disabled until a project is loaded.");
     }
 
     if (!compact) ImGui::SameLine();

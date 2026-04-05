@@ -1,4 +1,4 @@
-﻿#define IMGUI_ENABLE_DOCKING
+#define IMGUI_ENABLE_DOCKING
 #include "EditorUI.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -60,15 +60,12 @@ void DrawMenuStrip(float viewportWidth) {
         } else {
             ImGui::SameLine();
         }
-        ImGui::TextDisabled("2D Workspace  |  Responsive Unity Layout");
+        ImGui::TextDisabled("2D Workspace  |  Responsive Editor Layout");
     }
 }
 
 }
 
-
-
-// ================= 样式 =================
 void SetupEditorStyle()
 {
     ImGuiStyle& style = ImGui::GetStyle();
@@ -116,7 +113,6 @@ void SetupEditorStyle()
     style.Colors[ImGuiCol_MenuBarBg] = ImVec4(0.11f, 0.12f, 0.14f, 1.0f);
 }
 
-// ================= Toolbar =================
 void DrawToolbarContent(EditorState& editorState)
 {
     const float width = ImGui::GetContentRegionAvail().x;
@@ -133,7 +129,7 @@ void DrawToolbarContent(EditorState& editorState)
 
     if (compact) {
         ImGui::TextUnformatted("SDLTest 2D Editor");
-        ImGui::TextDisabled("Unity-style 2D workspace");
+        ImGui::TextDisabled("Responsive workspace");
         DrawToolbarButton("Play##Toolbar", EditorCommand::Play, editorState, buttonWidth);
         ImGui::SameLine();
         DrawToolbarButton("Pause##Toolbar", EditorCommand::Pause, editorState, buttonWidth);
@@ -158,7 +154,7 @@ void DrawToolbarContent(EditorState& editorState)
             ImGui::TextDisabled("| Scene, Project, Inspector");
         }
         else {
-            ImGui::TextDisabled("Unity-style 2D workspace");
+            ImGui::TextDisabled("Responsive workspace");
         }
 
         ImGui::TableNextColumn();
@@ -175,13 +171,12 @@ void DrawToolbarContent(EditorState& editorState)
         ImGui::Text("Mode: %s", modeText);
         ImGui::Text("Selection: %d", editorState.selectedObjectIndex);
         if (width >= 1180.0f) {
-            ImGui::TextDisabled("Panels dock and scale with the window for 2D editing.");
+            ImGui::TextDisabled("Panels dock and scale with the window.");
         }
         ImGui::EndTable();
     }
 }
 
-// ================= 主界面 =================
 void DrawEditorUI(SceneState& sceneState, EditorState& editorState, SDL_Texture* sceneTexture)
 {
     static bool dockspaceOpen = true;
@@ -201,7 +196,6 @@ void DrawEditorUI(SceneState& sceneState, EditorState& editorState, SDL_Texture*
         ImGuiWindowFlags_NoBringToFrontOnFocus |
         ImGuiWindowFlags_NoNavFocus;
 
-    // ===== DockSpace =====
     ImGui::SetNextWindowViewport(viewport->ID);
     ImGui::SetNextWindowPos(ImVec2(viewport->Pos.x, viewport->Pos.y + toolbarHeight));
     ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, viewport->Size.y - toolbarHeight));
@@ -213,12 +207,11 @@ void DrawEditorUI(SceneState& sceneState, EditorState& editorState, SDL_Texture*
     ImGuiID dockspace_id = ImGui::GetID("EditorDockspace");
     ImGui::DockSpace(dockspace_id);
 
-    // ===== 默认布局 =====
     if (!layout_initialized)
     {
         layout_initialized = true;
 
-    ImGui::DockBuilderRemoveNode(dockspace_id);
+        ImGui::DockBuilderRemoveNode(dockspace_id);
         ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
         ImGui::DockBuilderSetNodeSize(dockspace_id, ImVec2(viewport->Size.x, viewport->Size.y - toolbarHeight));
 
@@ -240,7 +233,6 @@ void DrawEditorUI(SceneState& sceneState, EditorState& editorState, SDL_Texture*
     ImGui::End();
     ImGui::PopStyleVar();
 
-    // ===== Toolbar（顶层）=====
     ImGui::SetNextWindowViewport(viewport->ID);
     ImGui::SetNextWindowPos(viewport->Pos);
     ImGui::SetNextWindowSize(ImVec2(viewport->Size.x, toolbarHeight));
@@ -264,7 +256,6 @@ void DrawEditorUI(SceneState& sceneState, EditorState& editorState, SDL_Texture*
     ImGui::PopStyleColor();
     ImGui::PopStyleVar(2);
 
-    // ===== Panels =====
     DrawHierarchyPanel(sceneState, editorState);
     DrawScenePanel(sceneState, editorState, sceneTexture);
     DrawInspectorPanel(sceneState, editorState);

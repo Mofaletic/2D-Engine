@@ -40,6 +40,7 @@ add_executable(SDLTest
     backend/resource/TextureManager.cpp
     backend/input/InputManager.cpp
     backend/core/GameLoop.cpp
+    backend/project/ProjectManager.cpp
     backend/resource/ResourceManager.cpp
     backend/resource/AssetRegistry.cpp
     backend/resource/ResourcePathUtils.cpp
