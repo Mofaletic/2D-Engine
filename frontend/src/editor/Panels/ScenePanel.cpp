@@ -1,4 +1,4 @@
-#include "ScenePanel.h"
+﻿#include "ScenePanel.h"
 #include "imgui.h"
 #include "../../../../backend/SceneSerializer.h"
 #include <algorithm>
@@ -7,6 +7,75 @@
 
 static std::string sceneStatus = "No scene operation yet";
 static std::string sceneFilePath = "scene.json";
+
+namespace {
+
+void DrawActionButtonRow(SceneState& sceneState, EditorState& editorState, int index) {
+    const float width = ImGui::GetContentRegionAvail().x;
+    const int columns = width < 780.0f ? 2 : 4;
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float buttonWidth = (width - spacing * static_cast<float>(columns - 1)) / static_cast<float>(columns);
+
+    auto drawButton = [&](const char* label, auto&& fn) {
+        if (ImGui::Button(label, ImVec2(buttonWidth, 0.0f))) {
+            fn();
+        }
+    };
+
+    drawButton("Reset Position", [&]() {
+        if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
+            sceneState.objects[index].position[0] = 0.0f;
+            sceneState.objects[index].position[1] = 0.0f;
+        }
+    });
+
+    if (columns > 1) ImGui::SameLine();
+    drawButton("Reset Scale", [&]() {
+        if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
+            sceneState.objects[index].scale[0] = 1.0f;
+            sceneState.objects[index].scale[1] = 1.0f;
+        }
+    });
+
+    if (columns > 2) {
+        ImGui::SameLine();
+    } else {
+        ImGui::NewLine();
+    }
+    drawButton("Add Object", [&]() {
+        GameObject newObject;
+        newObject.id = static_cast<int>(sceneState.objects.size());
+        newObject.name = "New Object " + std::to_string(newObject.id);
+        newObject.position[0] = 0.0f;
+        newObject.position[1] = 0.0f;
+        newObject.scale[0] = 1.0f;
+        newObject.scale[1] = 1.0f;
+        newObject.textureResourceId = 0;
+        newObject.texturePath = "pillar.png";
+        sceneState.objects.push_back(newObject);
+        editorState.selectedObjectIndex = static_cast<int>(sceneState.objects.size()) - 1;
+    });
+
+    if (columns > 3) {
+        ImGui::SameLine();
+    } else {
+        ImGui::NewLine();
+    }
+    drawButton("Delete Selected", [&]() {
+        if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
+            sceneState.objects.erase(sceneState.objects.begin() + index);
+
+            if (sceneState.objects.empty()) {
+                editorState.selectedObjectIndex = -1;
+            }
+            else if (index >= static_cast<int>(sceneState.objects.size())) {
+                editorState.selectedObjectIndex = static_cast<int>(sceneState.objects.size()) - 1;
+            }
+        }
+    });
+}
+
+}
 
 void DrawScenePanel(SceneState& sceneState, EditorState& editorState, SDL_Texture* sceneTexture)
 {
@@ -20,25 +89,31 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState, SDL_Textur
     else if (editorState.mode == EditorMode::Pause) modeText = "Pause";
 
     // ===== 顶部状态 =====
-    ImGui::Text("Scene Overview");
+    ImGui::TextUnformatted("Scene Overview");
     ImGui::Separator();
-    ImGui::Text("Mode: %s", modeText);
-    ImGui::Text("Object count: %d", static_cast<int>(sceneState.objects.size()));
+
+    if (ImGui::BeginTable("SceneOverview", 3, ImGuiTableFlags_SizingStretchProp)) {
+        ImGui::TableNextColumn();
+        ImGui::Text("Mode: %s", modeText);
+        ImGui::TableNextColumn();
+        ImGui::Text("Objects: %d", static_cast<int>(sceneState.objects.size()));
+        ImGui::TableNextColumn();
+        int index = editorState.selectedObjectIndex;
+        if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
+            ImGui::TextWrapped("Selected: %s", sceneState.objects[index].name.c_str());
+        }
+        else {
+            ImGui::TextUnformatted("Selected: None");
+        }
+        ImGui::EndTable();
+    }
 
     int index = editorState.selectedObjectIndex;
-    if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
-        ImGui::Text("Selected: %s", sceneState.objects[index].name.c_str());
-    }
-    else {
-        ImGui::Text("Selected: None");
-    }
-
-    // ===== 简单操作按钮 =====
     ImGui::Separator();
-    ImGui::Text("Viewport");
+    ImGui::TextUnformatted("Viewport");
 
     ImVec2 availableRegion = ImGui::GetContentRegionAvail();
-    float viewportHeight = std::max(180.0f, availableRegion.y * 0.45f);
+    float viewportHeight = std::clamp(availableRegion.y * 0.34f, 140.0f, 420.0f);
     ImVec2 viewportSize(availableRegion.x, viewportHeight);
 
     editorState.sceneViewportWidth = viewportSize.x;
@@ -76,56 +151,15 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState, SDL_Textur
     ImGui::EndChild();
 
     ImGui::Separator();
+    DrawActionButtonRow(sceneState, editorState, index);
+    ImGui::Spacing();
 
-    if (ImGui::Button("Reset Selected Position")) {
-        if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
-            sceneState.objects[index].position[0] = 0.0f;
-            sceneState.objects[index].position[1] = 0.0f;
-        }
-    }
-
-    ImGui::SameLine();
-
-    if (ImGui::Button("Reset Selected Scale")) {
-        if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
-            sceneState.objects[index].scale[0] = 1.0f;
-            sceneState.objects[index].scale[1] = 1.0f;
-        }
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("Add Test Object")) {
-        GameObject newObject;
-        newObject.id = static_cast<int>(sceneState.objects.size());
-        newObject.name = "New Object " + std::to_string(newObject.id);
-        newObject.position[0] = 0.0f;
-        newObject.position[1] = 0.0f;
-        newObject.scale[0] = 1.0f;
-        newObject.scale[1] = 1.0f;
-        newObject.texturePath = "test.png";
-
-        sceneState.objects.push_back(newObject);
-        editorState.selectedObjectIndex = static_cast<int>(sceneState.objects.size()) - 1;
-    }
-
-    ImGui::SameLine();
-
-    if (ImGui::Button("Delete Selected")) {
-        if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
-            sceneState.objects.erase(sceneState.objects.begin() + index);
-
-            if (sceneState.objects.empty()) {
-                editorState.selectedObjectIndex = -1;
-            }
-            else if (index >= static_cast<int>(sceneState.objects.size())) {
-                editorState.selectedObjectIndex = static_cast<int>(sceneState.objects.size()) - 1;
-            }
-        }
-    }
-	// ===== 场景文件操作 =====
     static char sceneNameBuffer[128] = "TestScene";
 
     ImGui::InputText("Scene Name", sceneNameBuffer, sizeof(sceneNameBuffer));
+
+    const float sceneToolsWidth = ImGui::GetContentRegionAvail().x;
+    const bool stackSceneButtons = sceneToolsWidth < 520.0f;
 
     if (ImGui::Button("Save Scene")) {
         if (SaveSceneToFile(sceneState, sceneNameBuffer, sceneFilePath)) {
@@ -136,7 +170,9 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState, SDL_Textur
         }
     }
 
-    ImGui::SameLine();
+    if (!stackSceneButtons) {
+        ImGui::SameLine();
+    }
 
     if (ImGui::Button("Load Scene")) {
         std::string loadedSceneName;
@@ -149,44 +185,55 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState, SDL_Textur
             sceneStatus = "Failed to load scene";
         }
     }
-    ImGui::Text("Scene File: %s", sceneFilePath.c_str());
-    ImGui::Text("Status: %s", sceneStatus.c_str());
+    ImGui::TextWrapped("Scene File: %s", sceneFilePath.c_str());
+    ImGui::TextWrapped("Status: %s", sceneStatus.c_str());
 
-    // ===== 全部对象列表 =====
     ImGui::Separator();
-    ImGui::Text("Scene Objects:");
+    ImGui::TextUnformatted("Scene Objects");
 
-    for (int i = 0; i < static_cast<int>(sceneState.objects.size()); ++i) {
-        auto& obj = sceneState.objects[i];
-        bool selected = (editorState.selectedObjectIndex == i);
+    float listHeight = std::clamp(ImGui::GetContentRegionAvail().y * 0.45f, 110.0f, 220.0f);
+    if (ImGui::BeginTable("SceneObjectTable", 3,
+        ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY,
+        ImVec2(0.0f, listHeight))) {
+        ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 1.5f);
+        ImGui::TableSetupColumn("Position", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableSetupColumn("Scale", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableHeadersRow();
 
-        // 左边：对象名可点击
-        if (ImGui::Selectable(obj.name.c_str(), selected, 0, ImVec2(150, 0))) {
-            editorState.selectedObjectIndex = i;
+        for (int i = 0; i < static_cast<int>(sceneState.objects.size()); ++i) {
+            auto& obj = sceneState.objects[i];
+            bool selected = (editorState.selectedObjectIndex == i);
+
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            if (ImGui::Selectable(obj.name.c_str(), selected, ImGuiSelectableFlags_SpanAllColumns)) {
+                editorState.selectedObjectIndex = i;
+            }
+            ImGui::TableNextColumn();
+            ImGui::Text("X %.1f  Y %.1f", obj.position[0], obj.position[1]);
+            ImGui::TableNextColumn();
+            ImGui::Text("X %.1f  Y %.1f", obj.scale[0], obj.scale[1]);
         }
-
-        // 右边：显示位置和缩放
-        ImGui::SameLine(180);
-        ImGui::Text("Pos(%.1f, %.1f)", obj.position[0], obj.position[1]);
-
-        ImGui::SameLine(320);
-        ImGui::Text("Scale(%.1f, %.1f)", obj.scale[0], obj.scale[1]);
+        ImGui::EndTable();
     }
 
     index = editorState.selectedObjectIndex;
-    // ===== 当前选中对象详细信息 =====
     ImGui::Separator();
+    ImGui::TextUnformatted("Selected Object Details");
+    const float detailsHeight = std::max(70.0f, ImGui::GetContentRegionAvail().y);
+    ImGui::BeginChild("SceneSelectedDetails", ImVec2(0.0f, detailsHeight), true);
     if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
         auto& obj = sceneState.objects[index];
-        ImGui::Text("Selected Object Details");
-        ImGui::Text("Name: %s", obj.name.c_str());
+        ImGui::TextWrapped("Name: %s", obj.name.c_str());
         ImGui::Text("ID: %d", obj.id);
         ImGui::Text("Position: %.1f, %.1f", obj.position[0], obj.position[1]);
         ImGui::Text("Scale: %.1f, %.1f", obj.scale[0], obj.scale[1]);
+        ImGui::TextWrapped("Texture Path: %s", obj.texturePath.c_str());
     }
     else {
-        ImGui::Text("No object selected");
+        ImGui::TextWrapped("No object selected. Pick an object from the list above to inspect it.");
     }
+    ImGui::EndChild();
 
     ImGui::End();
 

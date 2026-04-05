@@ -5,6 +5,8 @@
 void DrawInspectorPanel(SceneState& sceneState, EditorState& editorState)
 {
     ImGui::Begin("Inspector");
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::PushItemWidth(-1.0f);
 
     static int lastSelectedIndex = -1;
     static char textureBuffer[128] = "";
@@ -19,23 +21,40 @@ void DrawInspectorPanel(SceneState& sceneState, EditorState& editorState)
             lastSelectedIndex = index;
         }
 
-        ImGui::Text("Selected Object");
+        ImGui::TextUnformatted("Selected Object");
         ImGui::Separator();
-        ImGui::Text("Name: %s", obj.name.c_str());
-        ImGui::Text("ID: %d", obj.id);
+        ImGui::TextWrapped("Name: %s", obj.name.c_str());
+        ImGui::TextDisabled("GameObject ID");
+        ImGui::TextWrapped("%d", obj.id);
+        ImGui::TextDisabled("Texture Resource ID");
+        ImGui::TextWrapped("%llu", static_cast<unsigned long long>(obj.textureResourceId));
+        ImGui::Spacing();
 
+        ImGui::TextUnformatted("Rendering");
+        ImGui::TextDisabled("Bind imported project assets or enter a relative texture path.");
         if (ImGui::InputText("Texture Path", textureBuffer, sizeof(textureBuffer))) {
             obj.texturePath = textureBuffer;
+            const AssetRecord* record = editorState.assetRegistry.findByPath(obj.texturePath);
+            obj.textureResourceId = record ? record->id : 0;
         }
 
-        ImGui::Text("Texture: %s", obj.texturePath.c_str());
-        ImGui::InputFloat2("Position", obj.position);
-        ImGui::InputFloat2("Scale", obj.scale);
+        ImGui::TextWrapped("Bound Texture: %s", obj.texturePath.c_str());
+        ImGui::Spacing();
+        ImGui::TextUnformatted("Transform");
+        ImGui::TextDisabled("Use Scene or Hierarchy selection to edit this object.");
+        ImGui::TextDisabled("Position");
+        ImGui::InputFloat2("##Position", obj.position);
+        ImGui::TextDisabled("Scale");
+        ImGui::InputFloat2("##Scale", obj.scale);
     }
     else {
-        ImGui::Text("No object selected");
+        ImGui::TextUnformatted("No object selected");
+        ImGui::Separator();
+        ImGui::TextWrapped("Select a GameObject in Hierarchy or Scene to edit its transform and texture binding here.");
         lastSelectedIndex = -1;
     }
 
+    ImGui::PopItemWidth();
+    ImGui::PopTextWrapPos();
     ImGui::End();
 }

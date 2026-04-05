@@ -1,15 +1,18 @@
-#include "Engine.h"
+﻿#include "Engine.h"
 #include <iostream>
 #include "../../frontend/src/editor/EditorUI.h"
 #include <SDL3/SDL.h>
 #include <imgui.h>
 #include <backends/imgui_impl_sdl3.h>
 #include <backends/imgui_impl_sdlrenderer3.h>
+
 Engine::Engine() : running(false) {}
 
 extern void SetupEditorStyle();
 
 bool Engine::init() {
+    editorState.assetRegistry.setProjectAssetRoot("asset/imported");
+
     if (!windowManager.init("SDL3 Window Control Demo", 800, 600)) {
         return false;
     }
@@ -17,6 +20,19 @@ bool Engine::init() {
     if (!renderer2D.init(windowManager.getWindow())) {
         return false;
     }
+
+    resourceManager.setRenderer(renderer2D.getRenderer());
+    resourceManager.addSearchPath("asset/image/siheyuan");
+    resourceManager.addSearchPath("asset/imported");
+    const bool loadedManifest = editorState.assetRegistry.loadManifest("asset/asset_registry.json");
+    if (!loadedManifest) {
+        editorState.assetRegistry.rebuildFromProjectAssets();
+        editorState.assetRegistry.importFolder("asset");
+    }
+    editorState.assetRegistry.saveManifest("asset/asset_registry.json");
+    editorState.assetStatus = editorState.assetRegistry.getAssetCount() > 0
+        ? "Project asset library ready"
+        : "No registered project assets yet";
 
     // ✅ 初始化 ImGui
     ImGui::CreateContext();
@@ -28,8 +44,12 @@ bool Engine::init() {
     ImGui_ImplSDLRenderer3_Init(renderer2D.getRenderer());
 
     // 初始化场景数据
-    sceneState.objects.push_back({ 0, "Player", {100.0f, 100.0f}, {1.0f, 1.0f},"test.png"});
-    sceneState.objects.push_back({ 1, "Enemy", {300.0f, 200.0f}, {1.0f, 1.0f},"test.png"});
+    const AssetRecord* defaultTexture = editorState.assetRegistry.findByPath("pillar.png");
+    const std::uint64_t defaultTextureId = defaultTexture ? defaultTexture->id : 0;
+    const std::string defaultTexturePath =
+        defaultTexture && !defaultTexture->relativePath.empty() ? defaultTexture->relativePath : "pillar.png";
+    sceneState.objects.push_back({ 0, "Player", {100.0f, 100.0f}, {1.0f, 1.0f}, defaultTextureId, defaultTexturePath });
+    sceneState.objects.push_back({ 1, "Enemy", {300.0f, 200.0f}, {1.0f, 1.0f}, defaultTextureId, defaultTexturePath });
     editorState.selectedObjectIndex = 0;
 
     running = true;
@@ -122,6 +142,8 @@ void Engine::run() {
 }
 
 void Engine::shutdown() {
+    editorState.assetRegistry.saveManifest("asset/asset_registry.json");
+
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();

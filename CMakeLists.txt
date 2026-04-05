@@ -41,6 +41,8 @@ add_executable(SDLTest
     backend/input/InputManager.cpp
     backend/core/GameLoop.cpp
     backend/resource/ResourceManager.cpp
+    backend/resource/AssetRegistry.cpp
+    backend/resource/ResourcePathUtils.cpp
     backend/resource/Sprite.cpp
 
     # frontend 编辑器
@@ -67,6 +69,7 @@ add_executable(SDLTest
 target_link_libraries(SDLTest PRIVATE
     SDL3::SDL3
     SDL3_image::SDL3_image
+    Ole32
 )
 # 复制 asset 文件夹到 exe 目录
 add_custom_command(TARGET SDLTest POST_BUILD

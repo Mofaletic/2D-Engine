@@ -16,6 +16,7 @@ bool SaveSceneToFile(const SceneState& sceneState, const std::string& sceneName,
         objJson["name"] = obj.name;
         objJson["position"] = { obj.position[0], obj.position[1] };
         objJson["scale"] = { obj.scale[0], obj.scale[1] };
+        objJson["textureResourceId"] = obj.textureResourceId;
         objJson["texturePath"] = obj.texturePath;
 
         j["objects"].push_back(objJson);
@@ -63,7 +64,8 @@ bool LoadSceneFromFile(SceneState& sceneState, EditorState& editorState, std::st
                 obj.scale[1] = objJson["scale"][1].get<float>();
             }
 
-            obj.texturePath = objJson.value("texturePath", "test.png");
+            obj.textureResourceId = objJson.value("textureResourceId", static_cast<std::uint64_t>(0));
+            obj.texturePath = objJson.value("texturePath", "pillar.png");
 
             sceneState.objects.push_back(obj);
         }

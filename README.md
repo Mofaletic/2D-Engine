@@ -1,4 +1,4 @@
-# 轻量级 2D 游戏引擎与可视化编辑工具
+﻿# 轻量级 2D 游戏引擎与可视化编辑工具
 
 > A lightweight 2D game engine and editor prototype built with C++, SDL3 and Dear ImGui.
 
@@ -211,6 +211,47 @@ enemy.png
 - 尚未完成碰撞系统和 Demo 验证
 - 部分模块仍处于占位或过渡实现阶段
 - 构建脚本和工程结构仍会继续整理
+
+## ResourceManager Update Notes
+
+This update fills out the resource-system foundation around `ResourceManager`.
+
+Added files:
+
+- `backend/resource/ResourcePathUtils.h`
+  Declares the path helper functions used by the resource layer. It is responsible for path normalization, building search roots, and resource path resolution.
+- `backend/resource/ResourcePathUtils.cpp`
+  Implements the filesystem lookup logic for resource resolution. It supports direct relative paths, absolute paths, and recursive fallback search inside configured resource folders.
+- `backend/resource/AssetRegistry.h`
+  Declares the editor-facing asset registry used to register imported assets with ID, name, type and path metadata.
+- `backend/resource/AssetRegistry.cpp`
+  Implements project-style asset import, file copying, manifest persistence, recursive folder import, asset type detection, de-duplication by path and runtime lookup by resource ID or path.
+
+Current `ResourceManager` responsibilities:
+
+- texture loading
+- cache reuse by resolved file path
+- lookup by original identifier or resolved path
+- explicit single-texture release and full-cache release
+- renderer binding for repeated texture creation
+- search-path management
+- last-error reporting for failed resource operations
+
+Default search behavior:
+
+- current working directory
+- `asset`
+- `asset/image`
+- runtime-added path in `Engine`: `asset/image/siheyuan`
+
+Current asset import workflow:
+
+- import image files or a folder from the editor's `Project` panel
+- copy imported resources into the project asset library under `asset/imported`
+- persist registered assets into `asset/asset_registry.json`
+- reload the registry automatically on the next engine startup
+- register each asset with resource ID, name, type, source path and relative path
+- assign registered texture resources to scene objects through `textureResourceId`
 
 ## Development Philosophy
 
