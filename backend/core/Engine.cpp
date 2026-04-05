@@ -40,6 +40,12 @@ bool Engine::init() {
         defaultTexture && !defaultTexture->relativePath.empty() ? defaultTexture->relativePath : "pillar.png";
     sceneState.objects.push_back({ 0, "Player", {100.0f, 100.0f}, {1.0f, 1.0f}, defaultTextureId, defaultTexturePath });
     sceneState.objects.push_back({ 1, "Enemy", {300.0f, 200.0f}, {1.0f, 1.0f}, defaultTextureId, defaultTexturePath });
+    sceneState.objects.push_back({ 0, "Player", {100.0f, 100.0f}, {1.0f, 1.0f}, 0, "pillar.png" });
+    sceneState.objects.push_back({ 1, "Enemy", {300.0f, 200.0f}, {1.0f, 1.0f}, 0, "pillar.png" });
+>>>>>>>>> Temporary merge branch 2
+    sceneState.objects.push_back({ 0, "Player", {100.0f, 100.0f}, {1.0f, 1.0f}, 0, "pillar.png" });
+    sceneState.objects.push_back({ 1, "Enemy", {300.0f, 200.0f}, {1.0f, 1.0f}, 0, "pillar.png" });
+>>>>>>>>> Temporary merge branch 2
     editorState.selectedObjectIndex = 0;
     editorState.assetStatus = "Create or open a project to import and persist project assets";
     editorState.sceneFilePath.clear();
@@ -260,13 +266,14 @@ void Engine::run() {
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui::NewFrame();
 
-        renderer2D.clear();
-        DrawEditorUI(sceneState, editorState, renderer2D.getSceneRenderTarget());
-
+        // 5. 逻辑更新
         // 5. 逻辑更新
         handleEditorCommands();
         handleProjectCommands();
         syncProjectAssets();
+        handleProjectCommands();
+        syncProjectAssets();
+>>>>>>>>> Temporary merge branch 2
         gameLoop.update(sceneState, editorState);
 
         renderer2D.resizeSceneRenderTarget(
