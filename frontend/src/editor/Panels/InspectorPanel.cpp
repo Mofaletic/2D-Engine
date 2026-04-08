@@ -7,6 +7,42 @@
 #include <cstdio>
 #include <cstring>
 
+namespace {
+
+void DrawResponsiveInspectorButtonRow(
+    const char* firstLabel,
+    const char* secondLabel,
+    const char* thirdLabel,
+    bool& firstPressed,
+    bool& secondPressed,
+    bool& thirdPressed)
+{
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float availableWidth = ImGui::GetContentRegionAvail().x;
+    const float spacing = style.ItemSpacing.x;
+    const float minButtonWidth = 96.0f;
+    const float rowButtonWidth = (availableWidth - spacing * 2.0f) / 3.0f;
+
+    firstPressed = false;
+    secondPressed = false;
+    thirdPressed = false;
+
+    if (rowButtonWidth >= minButtonWidth) {
+        firstPressed = ImGui::Button(firstLabel, ImVec2(rowButtonWidth, 0.0f));
+        ImGui::SameLine();
+        secondPressed = ImGui::Button(secondLabel, ImVec2(rowButtonWidth, 0.0f));
+        ImGui::SameLine();
+        thirdPressed = ImGui::Button(thirdLabel, ImVec2(rowButtonWidth, 0.0f));
+        return;
+    }
+
+    firstPressed = ImGui::Button(firstLabel, ImVec2(-1.0f, 0.0f));
+    secondPressed = ImGui::Button(secondLabel, ImVec2(-1.0f, 0.0f));
+    thirdPressed = ImGui::Button(thirdLabel, ImVec2(-1.0f, 0.0f));
+}
+
+}
+
 void DrawInspectorPanel(SceneState& sceneState, EditorState& editorState)
 {
     ImGui::Begin("Inspector", &editorState.showInspector);
@@ -31,14 +67,16 @@ void DrawInspectorPanel(SceneState& sceneState, EditorState& editorState)
 
         ImGui::TextUnformatted("Selected Object");
         ImGui::Separator();
-        if (ImGui::InputText("Name", nameBuffer.data(), nameBuffer.size())) {
+        ImGui::TextUnformatted("Name");
+        if (ImGui::InputText("##InspectorName", nameBuffer.data(), nameBuffer.size())) {
             obj.name = nameBuffer.data();
         }
         ImGui::Text("GameObject ID: %d", obj.id);
 
         if (ImGui::CollapsingHeader("Rendering", ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::TextDisabled("Bind imported project assets or enter a relative texture path.");
-            if (ImGui::InputText("Texture Path", textureBuffer, sizeof(textureBuffer))) {
+            ImGui::TextUnformatted("Texture Path");
+            if (ImGui::InputText("##InspectorTexturePath", textureBuffer, sizeof(textureBuffer))) {
                 obj.texturePath = textureBuffer;
                 const AssetRecord* record = editorState.assetRegistry.findByPath(obj.texturePath);
                 obj.textureResourceId = record ? record->id : 0;
@@ -52,7 +90,8 @@ void DrawInspectorPanel(SceneState& sceneState, EditorState& editorState)
 
         if (ImGui::CollapsingHeader("Script", ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::TextWrapped("Bound Script: %s", obj.scriptPath.empty() ? "None" : obj.scriptPath.c_str());
-            if (ImGui::BeginCombo("Script Asset", obj.scriptPath.empty() ? "None" : obj.scriptPath.c_str())) {
+            ImGui::TextUnformatted("Script Asset");
+            if (ImGui::BeginCombo("##InspectorScriptAsset", obj.scriptPath.empty() ? "None" : obj.scriptPath.c_str())) {
                 const bool noScriptSelected = obj.scriptPath.empty();
                 if (ImGui::Selectable("None", noScriptSelected)) {
                     obj.scriptResourceId = 0;
@@ -84,21 +123,35 @@ void DrawInspectorPanel(SceneState& sceneState, EditorState& editorState)
         }
 
         if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::InputFloat2("Position", obj.position);
-            ImGui::InputFloat2("Scale", obj.scale);
-            ImGui::InputFloat("Rotation", &obj.rotation);
+            ImGui::TextUnformatted("Position");
+            ImGui::InputFloat2("##InspectorPosition", obj.position);
+            ImGui::TextUnformatted("Scale");
+            ImGui::InputFloat2("##InspectorScale", obj.scale);
+            ImGui::TextUnformatted("Rotation");
+            ImGui::InputFloat("##InspectorRotation", &obj.rotation);
 
-            if (ImGui::Button("Reset Position")) {
+            bool resetPositionPressed = false;
+            bool resetScalePressed = false;
+            bool resetRotationPressed = false;
+            DrawResponsiveInspectorButtonRow(
+                "Reset Position",
+                "Reset Scale",
+                "Reset Rotation",
+                resetPositionPressed,
+                resetScalePressed,
+                resetRotationPressed);
+
+            if (resetPositionPressed) {
                 ResetObjectPosition(obj);
                 AddEditorLog(editorState, EditorLogLevel::Info, "Reset position from Inspector.");
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Reset Scale")) {
+
+            if (resetScalePressed) {
                 ResetObjectScale(obj);
                 AddEditorLog(editorState, EditorLogLevel::Info, "Reset scale from Inspector.");
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Reset Rotation")) {
+
+            if (resetRotationPressed) {
                 ResetObjectRotation(obj);
                 AddEditorLog(editorState, EditorLogLevel::Info, "Reset rotation from Inspector.");
             }

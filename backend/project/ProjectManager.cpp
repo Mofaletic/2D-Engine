@@ -22,8 +22,14 @@ bool BuildProjectDescriptor(const fs::path& projectRoot, ProjectDescriptor& outP
     const fs::path projectFilePath = projectRoot / "project.json";
     std::ifstream file(projectFilePath);
     if (!file.is_open()) {
-        outError = "Project file not found: " + Normalize(projectFilePath);
-        return false;
+        outProject.name = projectRoot.filename().string();
+        outProject.rootPath = Normalize(projectRoot);
+        outProject.projectFilePath = Normalize(projectFilePath);
+        outProject.assetRootPath = Normalize(projectRoot / "Assets");
+        outProject.assetManifestPath = Normalize(projectRoot / "Settings/asset_registry.json");
+        outProject.defaultScenePath = Normalize(projectRoot / "Scenes/Main.scene.json");
+        outError.clear();
+        return true;
     }
 
     json data;
@@ -460,6 +466,60 @@ bool RenameProjectEntry(const ProjectDescriptor& project, const std::string& tar
     }
 
     outRenamedPath = Normalize(renamedPath);
+    outError.clear();
+    return true;
+}
+
+bool MoveProjectEntry(const ProjectDescriptor& project, const std::string& sourcePath, const std::string& targetDirectory, std::string& outMovedPath, std::string& outError) {
+    const fs::path source = ResourcePathUtils::Utf8ToPath(sourcePath);
+    const fs::path destinationDirectory = ResourcePathUtils::Utf8ToPath(targetDirectory);
+    const fs::path root = ResourcePathUtils::Utf8ToPath(project.rootPath);
+
+    if (!IsPathWithinRoot(root, source) || !IsPathWithinRoot(root, destinationDirectory)) {
+        outError = "Source or destination is outside the project.";
+        return false;
+    }
+
+    std::error_code ec;
+    if (!fs::exists(source, ec)) {
+        outError = "Source does not exist: " + Normalize(source);
+        return false;
+    }
+
+    if (!fs::exists(destinationDirectory, ec) || !fs::is_directory(destinationDirectory, ec)) {
+        outError = "Destination folder does not exist: " + Normalize(destinationDirectory);
+        return false;
+    }
+
+    if (source == root) {
+        outError = "The project root cannot be moved.";
+        return false;
+    }
+
+    if (source.parent_path() == destinationDirectory) {
+        outMovedPath = Normalize(source);
+        outError.clear();
+        return true;
+    }
+
+    if (fs::is_directory(source, ec) && IsPathWithinRoot(source, destinationDirectory)) {
+        outError = "A folder cannot be moved into itself.";
+        return false;
+    }
+
+    const fs::path movedPath = destinationDirectory / source.filename();
+    if (fs::exists(movedPath, ec)) {
+        outError = "A file with that name already exists: " + Normalize(movedPath);
+        return false;
+    }
+
+    fs::rename(source, movedPath, ec);
+    if (ec) {
+        outError = "Failed to move: " + Normalize(source);
+        return false;
+    }
+
+    outMovedPath = Normalize(movedPath);
     outError.clear();
     return true;
 }
