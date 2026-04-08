@@ -8,8 +8,6 @@
 #include "../core/SceneState.h"
 #include "../../frontend/src/EditorState.h"
 
-#include <mutex>
-
 class Engine {
 private:
     WindowManager windowManager;
@@ -23,8 +21,6 @@ private:
     SceneState playModeSceneBackup;
     bool hasPlayModeBackup = false;
     Uint64 lastProjectSyncTick = 0;
-    std::mutex projectMutex;
-    ProjectDescriptor pendingProjectResult;
 
 public:
     Engine();

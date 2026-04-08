@@ -10,8 +10,6 @@
 #include <imgui.h>
 
 #include <filesystem>
-#include <future>
-#include <chrono>
 
 namespace fs = std::filesystem;
 
@@ -218,72 +216,49 @@ void Engine::syncProjectAssets(bool force) {
 }
 
 void Engine::handleProjectCommands() {
-    // Check if async task completed
-    if (editorState.projectTaskStatus == ProjectTaskStatus::Running) {
-        if (editorState.projectTaskFuture.valid() &&
-            editorState.projectTaskFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
-            editorState.projectTaskFuture.get();
-
-            std::lock_guard<std::mutex> lock(projectMutex);
-            if (editorState.projectTaskStatus == ProjectTaskStatus::Done) {
-                openProject(pendingProjectResult);
-                editorState.projectStatus = "Project loaded: " + pendingProjectResult.name;
-            } else if (editorState.projectTaskStatus == ProjectTaskStatus::Failed) {
-                editorState.projectStatus = editorState.projectTaskError;
-                AddEditorLog(editorState, EditorLogLevel::Error, editorState.projectTaskError);
-            }
-            editorState.projectTaskStatus = ProjectTaskStatus::Idle;
-        }
-        return;
-    }
-
     if (editorState.pendingProjectCommand == ProjectCommand::None) {
         return;
     }
 
-    // Start async task for Create/Open
-    if (editorState.pendingProjectCommand == ProjectCommand::Create ||
-        editorState.pendingProjectCommand == ProjectCommand::Open) {
+    ProjectDescriptor project;
+    std::string error;
+    bool success = false;
 
-        editorState.projectTaskStatus = ProjectTaskStatus::Running;
-        editorState.projectStatus = "Loading project...";
-
-        const ProjectCommand cmd = editorState.pendingProjectCommand;
-        const std::string projectName = editorState.pendingProjectName;
-        const std::string projectDir = editorState.pendingProjectDirectory;
-
-        editorState.projectTaskFuture = std::async(std::launch::async, [this, cmd, projectName, projectDir]() {
-            ProjectDescriptor project;
-            std::string error;
-            bool success = false;
-
-            if (cmd == ProjectCommand::Create) {
-                success = ProjectManager::CreateProject(projectName, projectDir, project, error);
-            } else if (cmd == ProjectCommand::Open) {
-                success = ProjectManager::LoadProject(projectDir, project, error);
-            }
-
-            std::lock_guard<std::mutex> lock(projectMutex);
-            if (success) {
-                pendingProjectResult = project;
-                editorState.projectTaskStatus = ProjectTaskStatus::Done;
-            } else {
-                editorState.projectTaskError = error;
-                editorState.projectTaskStatus = ProjectTaskStatus::Failed;
-            }
-        });
-
-        editorState.pendingProjectCommand = ProjectCommand::None;
-        editorState.pendingProjectDirectory.clear();
-        editorState.pendingProjectName.clear();
-        return;
-    }
-
-    // Sync is still synchronous (fast operation)
-    if (editorState.pendingProjectCommand == ProjectCommand::Sync) {
+    switch (editorState.pendingProjectCommand) {
+    case ProjectCommand::Create:
+        success = ProjectManager::CreateProject(
+            editorState.pendingProjectName,
+            editorState.pendingProjectDirectory,
+            project,
+            error
+        );
+        if (success) {
+            openProject(project);
+        }
+        break;
+    case ProjectCommand::Open:
+        success = ProjectManager::LoadProject(editorState.pendingProjectDirectory, project, error);
+        if (success) {
+            openProject(project);
+        }
+        break;
+    case ProjectCommand::Sync:
         syncProjectAssets(true);
-        editorState.pendingProjectCommand = ProjectCommand::None;
+        success = true;
+        break;
+    case ProjectCommand::None:
+    default:
+        break;
     }
+
+    if (!success && !error.empty()) {
+        editorState.projectStatus = error;
+        AddEditorLog(editorState, EditorLogLevel::Error, error);
+    }
+
+    editorState.pendingProjectCommand = ProjectCommand::None;
+    editorState.pendingProjectDirectory.clear();
+    editorState.pendingProjectName.clear();
 }
 
 void Engine::run() {
