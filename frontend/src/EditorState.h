@@ -47,6 +47,14 @@ struct EditorState {
     float sceneViewportScreenY = 0.0f;
     float sceneViewportScreenWidth = 0.0f;
     float sceneViewportScreenHeight = 0.0f;
+    float sceneViewZoom = 1.0f;
+    float sceneViewCenterX = 0.0f;
+    float sceneViewCenterY = 0.0f;
+    float sceneViewOffsetX = 0.0f;
+    float sceneViewOffsetY = 0.0f;
+    bool isPanningSceneView = false;
+    float sceneViewPanLastScreenX = 0.0f;
+    float sceneViewPanLastScreenY = 0.0f;
     bool isDraggingSceneObject = false;
     int draggingObjectIndex = -1;
     float sceneDragOffsetX = 0.0f;

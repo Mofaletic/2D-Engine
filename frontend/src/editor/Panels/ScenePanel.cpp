@@ -7,11 +7,10 @@
 #include <algorithm>
 #include <cstdint>
 
-static std::string sceneStatus = "No scene operation yet";
-
 namespace {
 
 constexpr float kSceneObjectBaseSize = 64.0f;
+constexpr float kMinSceneViewportHeight = 180.0f;
 
 bool PointInRect(float x, float y, float left, float top, float width, float height) {
     return x >= left && y >= top && x <= left + width && y <= top + height;
@@ -80,50 +79,64 @@ void AssignScriptAssetToObject(SceneState& sceneState, EditorState& editorState,
     AddEditorLog(editorState, EditorLogLevel::Info, editorState.assetStatus);
 }
 
-void DrawActionButtonRow(SceneState& sceneState, EditorState& editorState, int index) {
-    const float width = ImGui::GetContentRegionAvail().x;
-    const int columns = width < 780.0f ? 2 : 5;
-    const float spacing = ImGui::GetStyle().ItemSpacing.x;
-    const float buttonWidth = (width - spacing * static_cast<float>(columns - 1)) / static_cast<float>(columns);
+void DrawSceneToolbar(SceneState& sceneState, EditorState& editorState, int index) {
+    const bool hasSelection = index >= 0 && index < static_cast<int>(sceneState.objects.size());
+    const bool hasProject = !editorState.sceneFilePath.empty();
 
-    auto drawButton = [&](const char* label, auto&& fn) {
-        if (ImGui::Button(label, ImVec2(buttonWidth, 0.0f))) {
-            fn();
+    ImGui::BeginDisabled(!hasProject);
+    if (ImGui::Button("Save Scene")) {
+        std::string sceneName = "UntitledScene";
+        if (hasSelection) {
+            sceneName = sceneState.objects[index].name;
+        } else if (!editorState.projectName.empty()) {
+            sceneName = editorState.projectName;
         }
-    };
 
-    drawButton("Reset Position", [&]() {
-        if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
-            ResetObjectPosition(sceneState.objects[index]);
-            AddEditorLog(editorState, EditorLogLevel::Info, "Reset selected object position.");
+        if (SaveSceneToFile(sceneState, sceneName, editorState.sceneFilePath)) {
+            AddEditorLog(editorState, EditorLogLevel::Info, "Saved scene: " + editorState.sceneFilePath);
+        } else {
+            AddEditorLog(editorState, EditorLogLevel::Error, "Failed to save scene: " + editorState.sceneFilePath);
         }
-    });
+    }
+    ImGui::EndDisabled();
 
-    if (columns > 1) ImGui::SameLine();
-    drawButton("Reset Scale", [&]() {
-        if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
-            ResetObjectScale(sceneState.objects[index]);
-            AddEditorLog(editorState, EditorLogLevel::Info, "Reset selected object scale.");
-        }
-    });
+    if (!hasProject && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+        ImGui::SetTooltip("Create or open a project before saving the scene.");
+    }
 
-    if (columns > 2) ImGui::SameLine();
-    drawButton("Reset Rotation", [&]() {
-        if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
-            ResetObjectRotation(sceneState.objects[index]);
-            AddEditorLog(editorState, EditorLogLevel::Info, "Reset selected object rotation.");
-        }
-    });
-
-    if (columns > 3) ImGui::SameLine();
-    drawButton("Add Empty", [&]() {
+    ImGui::SameLine();
+    if (ImGui::Button("Add Empty")) {
         CreateEmptyObject(sceneState, editorState, "GameObject", "Scene panel");
-    });
+    }
 
-    if (columns > 4) ImGui::SameLine();
-    drawButton("Delete Selected", [&]() {
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!hasSelection);
+    if (ImGui::Button("Delete Selected")) {
         DeleteSelectedObject(sceneState, editorState);
-    });
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset Position")) {
+        ResetObjectPosition(sceneState.objects[index]);
+        AddEditorLog(editorState, EditorLogLevel::Info, "Reset selected object position.");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset Scale")) {
+        ResetObjectScale(sceneState.objects[index]);
+        AddEditorLog(editorState, EditorLogLevel::Info, "Reset selected object scale.");
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset Rotation")) {
+        ResetObjectRotation(sceneState.objects[index]);
+        AddEditorLog(editorState, EditorLogLevel::Info, "Reset selected object rotation.");
+    }
+    ImGui::EndDisabled();
+
+    ImGui::SameLine();
+    if (hasSelection) {
+        ImGui::TextDisabled("Selected: %s", sceneState.objects[index].name.c_str());
+    } else {
+        ImGui::TextDisabled("Selected: None");
+    }
 }
 
 }
@@ -133,14 +146,22 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState, const Scen
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 8));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
 
-    ImGui::Begin("Scene", &editorState.showScene);
+    ImGui::Begin(kScenePanelWindowName, &editorState.showScene);
 
     const int index = editorState.selectedObjectIndex;
-    ImGui::TextUnformatted("Viewport");
+
+    if (index >= 0 && index >= static_cast<int>(sceneState.objects.size())) {
+        editorState.selectedObjectIndex = -1;
+    }
+
+    DrawSceneToolbar(sceneState, editorState, editorState.selectedObjectIndex);
+
+    ImGui::Separator();
 
     ImVec2 availableRegion = ImGui::GetContentRegionAvail();
-    float viewportHeight = std::clamp(availableRegion.y * 0.34f, 140.0f, 420.0f);
-    ImVec2 viewportSize(availableRegion.x, viewportHeight);
+    ImVec2 viewportSize(
+        std::max(availableRegion.x, 1.0f),
+        std::max(availableRegion.y, kMinSceneViewportHeight));
 
     editorState.sceneViewportWidth = viewportSize.x;
     editorState.sceneViewportHeight = viewportSize.y;
@@ -220,50 +241,6 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState, const Scen
 
     ImGui::EndChild();
     ImGui::PopStyleColor();
-
-    ImGui::Separator();
-    DrawActionButtonRow(sceneState, editorState, index);
-    ImGui::Spacing();
-
-    const bool hasProject = !editorState.sceneFilePath.empty();
-    if (!hasProject) {
-        ImGui::BeginDisabled();
-    }
-
-    if (ImGui::Button("Save Scene")) {
-        std::string sceneName = "UntitledScene";
-        if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
-            sceneName = sceneState.objects[index].name;
-        } else if (!editorState.projectName.empty()) {
-            sceneName = editorState.projectName;
-        }
-
-        if (SaveSceneToFile(sceneState, sceneName, editorState.sceneFilePath)) {
-            sceneStatus = "Scene saved successfully";
-            AddEditorLog(editorState, EditorLogLevel::Info, "Saved scene: " + editorState.sceneFilePath);
-        }
-        else {
-            sceneStatus = "Failed to save scene";
-            AddEditorLog(editorState, EditorLogLevel::Error, "Failed to save scene: " + editorState.sceneFilePath);
-        }
-    }
-
-    if (!hasProject) {
-        ImGui::EndDisabled();
-        ImGui::TextWrapped("Create or open a project before saving the scene.");
-    }
-    else {
-        ImGui::TextWrapped("Scene File: %s", editorState.sceneFilePath.c_str());
-    }
-
-    if (index >= 0 && index < static_cast<int>(sceneState.objects.size())) {
-        const GameObject& object = sceneState.objects[index];
-        ImGui::TextWrapped("Selected: %s", object.name.c_str());
-        ImGui::TextWrapped("Texture: %s", object.texturePath.empty() ? "None" : object.texturePath.c_str());
-    }
-
-    ImGui::TextWrapped("Status: %s", sceneStatus.c_str());
-    ImGui::TextWrapped("Scene Input: click to select, drag to move, drop textures onto empty space to create sprites, or onto objects to rebind them.");
 
     ImGui::End();
     ImGui::PopStyleVar(2);

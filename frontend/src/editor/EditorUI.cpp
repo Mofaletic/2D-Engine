@@ -118,7 +118,7 @@ void DrawComponentMenu(SceneState& sceneState, EditorState& editorState) {
 }
 
 void DrawWindowMenu(EditorState& editorState) {
-    ImGui::MenuItem("Scene", nullptr, &editorState.showScene);
+    ImGui::MenuItem(kScenePanelWindowName, nullptr, &editorState.showScene);
     ImGui::MenuItem("Hierarchy", nullptr, &editorState.showHierarchy);
     ImGui::MenuItem("Inspector", nullptr, &editorState.showInspector);
     ImGui::MenuItem("Project", nullptr, &editorState.showProject);
@@ -320,14 +320,15 @@ void DrawEditorUI(SceneState& sceneState, EditorState& editorState, const SceneV
         ImGui::DockBuilderSetNodeSize(dockspace_id, ImVec2(viewport->Size.x, viewport->Size.y - toolbarHeight));
 
         ImGuiID dock_main = dockspace_id;
-        ImGuiID dock_left = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Left, 0.16f, nullptr, &dock_main);
+        ImGuiID dock_project = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Left, 0.22f, nullptr, &dock_main);
+        ImGuiID dock_hierarchy = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Left, 0.13f, nullptr, &dock_main);
         ImGuiID dock_right = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Right, 0.28f, nullptr, &dock_main);
         ImGuiID dock_bottom = ImGui::DockBuilderSplitNode(dock_main, ImGuiDir_Down, 0.24f, nullptr, &dock_main);
 
-        ImGui::DockBuilderDockWindow("Hierarchy", dock_left);
+        ImGui::DockBuilderDockWindow("Project", dock_project);
+        ImGui::DockBuilderDockWindow("Hierarchy", dock_hierarchy);
         ImGui::DockBuilderDockWindow("Inspector", dock_right);
-        ImGui::DockBuilderDockWindow("Scene", dock_main);
-        ImGui::DockBuilderDockWindow("Project", dock_bottom);
+        ImGui::DockBuilderDockWindow(kScenePanelWindowName, dock_main);
         ImGui::DockBuilderDockWindow("Console", dock_bottom);
 
         ImGui::DockBuilderFinish(dockspace_id);

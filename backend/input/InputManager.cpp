@@ -9,6 +9,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 
 namespace {
@@ -46,15 +47,9 @@ bool MapScreenToScenePoint(
         return false;
     }
 
-    const float normalizedX = editorState.sceneViewportScreenWidth > 0.0f
-        ? localX / editorState.sceneViewportScreenWidth
-        : 0.0f;
-    const float normalizedY = editorState.sceneViewportScreenHeight > 0.0f
-        ? localY / editorState.sceneViewportScreenHeight
-        : 0.0f;
-
-    sceneX = normalizedX * editorState.sceneViewportWidth;
-    sceneY = normalizedY * editorState.sceneViewportHeight;
+    const float zoom = editorState.sceneViewZoom > 0.0f ? editorState.sceneViewZoom : 1.0f;
+    sceneX = (localX - editorState.sceneViewOffsetX) / zoom;
+    sceneY = (localY - editorState.sceneViewOffsetY) / zoom;
     return true;
 }
 
@@ -76,6 +71,23 @@ void StopSceneDrag(EditorState& editorState) {
     editorState.draggingObjectIndex = -1;
     editorState.sceneDragOffsetX = 0.0f;
     editorState.sceneDragOffsetY = 0.0f;
+}
+
+bool IsInsideSceneViewport(float screenX, float screenY, const EditorState& editorState) {
+    return PointInRect(
+        screenX,
+        screenY,
+        editorState.sceneViewportScreenX,
+        editorState.sceneViewportScreenY,
+        editorState.sceneViewportScreenWidth,
+        editorState.sceneViewportScreenHeight);
+}
+
+void RefreshSceneViewOffset(EditorState& editorState) {
+    const float viewportWidth = std::max(editorState.sceneViewportWidth, 1.0f);
+    const float viewportHeight = std::max(editorState.sceneViewportHeight, 1.0f);
+    editorState.sceneViewOffsetX = viewportWidth * 0.5f - editorState.sceneViewCenterX * editorState.sceneViewZoom;
+    editorState.sceneViewOffsetY = viewportHeight * 0.5f - editorState.sceneViewCenterY * editorState.sceneViewZoom;
 }
 
 }
@@ -150,10 +162,26 @@ void InputManager::processEvents(WindowManager& windowManager, SceneState& scene
                 editorState.sceneDragOffsetY = sceneY - object.position[1];
             } else {
                 StopSceneDrag(editorState);
+            } else if (event.button.button == SDL_BUTTON_MIDDLE) {
+                editorState.isPanningSceneView = false;
+            }
+            break;
+
+        case SDL_EVENT_MOUSE_WHEEL: {
+            const ImVec2 mousePos = ImGui::GetIO().MousePos;
+            if (!IsInsideSceneViewport(mousePos.x, mousePos.y, editorState) || event.wheel.y == 0.0f) {
+                break;
+            }
+
+            float worldX = 0.0f;
+            float worldY = 0.0f;
+            if (!MapScreenToScenePoint(mousePos.x, mousePos.y, editorState, worldX, worldY)) {
+                break;
             }
         } else if (!ImGui::GetIO().WantCaptureMouse) {
             editorState.selectedObjectIndex = -1;
             StopSceneDrag(editorState);
+        }
         }
     }
 
@@ -177,6 +205,10 @@ void InputManager::processEvents(WindowManager& windowManager, SceneState& scene
 
     if (editorState.draggingObjectIndex >= static_cast<int>(sceneState.objects.size())) {
         StopSceneDrag(editorState);
+    }
+
+    if (editorState.draggingObjectIndex < 0) {
+        editorState.isDraggingSceneObject = false;
     }
 }
 

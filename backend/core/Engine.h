@@ -33,6 +33,8 @@ public:
     void handleProjectCommands();
     bool openProject(const ProjectDescriptor& project);
     void configureResourceSearchPaths();
+    void frameSceneView();
+    void refreshSceneViewTransform();
     void syncProjectAssets(bool force = false);
     void clearMissingAssetReferences(const std::vector<AssetRecord>& removedAssets);
 };
