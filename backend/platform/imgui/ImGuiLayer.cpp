@@ -8,6 +8,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <iostream>
 
 #ifndef IM_OFFSETOF
@@ -16,6 +17,39 @@
 
 namespace {
 ImGuiLayer* g_ActiveImGuiLayer = nullptr;
+
+void ConfigureDefaultUiFont(ImGuiIO& io) {
+    const std::array<const char*, 4> fontCandidates = {
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/msyh.ttf",
+        "C:/Windows/Fonts/msyhbd.ttc",
+        "C:/Windows/Fonts/msyhbd.ttf"
+    };
+
+    ImFont* loadedFont = nullptr;
+    constexpr float kFontSize = 24.0f;
+    for (const char* candidate : fontCandidates) {
+        if (!std::filesystem::exists(candidate)) {
+            continue;
+        }
+
+        loadedFont = io.Fonts->AddFontFromFileTTF(
+            candidate,
+            kFontSize,
+            nullptr,
+            io.Fonts->GetGlyphRangesChineseSimplifiedCommon()
+        );
+        if (loadedFont != nullptr) {
+            break;
+        }
+    }
+
+    if (loadedFont != nullptr) {
+        io.FontDefault = loadedFont;
+    } else {
+        io.Fonts->AddFontDefault();
+    }
+}
 
 int KeyToImGuiKey(int key) {
     switch (key) {
@@ -141,6 +175,7 @@ bool ImGuiLayer::Init(GLFWwindow* window) {
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.BackendPlatformName = "CustomGLFW";
     io.BackendRendererName = "CustomOpenGL3";
+    ConfigureDefaultUiFont(io);
 
     m_MouseCursors[ImGuiMouseCursor_Arrow] = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
     m_MouseCursors[ImGuiMouseCursor_TextInput] = glfwCreateStandardCursor(GLFW_IBEAM_CURSOR);

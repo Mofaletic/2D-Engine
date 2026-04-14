@@ -16,26 +16,32 @@ bool PointInRect(float x, float y, float left, float top, float width, float hei
     return x >= left && y >= top && x <= left + width && y <= top + height;
 }
 
-bool MapScreenToScenePoint(const EditorState& editorState, const ImVec2& screenPos, float& sceneX, float& sceneY) {
-    if (editorState.sceneViewportScreenWidth <= 0.0f || editorState.sceneViewportScreenHeight <= 0.0f ||
-        editorState.sceneViewportWidth <= 0.0f || editorState.sceneViewportHeight <= 0.0f) {
+bool MapScreenToScenePoint(
+    const ImVec2& rectMin,
+    const ImVec2& rectSize,
+    float sceneWidth,
+    float sceneHeight,
+    const ImVec2& screenPos,
+    float& sceneX,
+    float& sceneY) {
+    if (rectSize.x <= 0.0f || rectSize.y <= 0.0f || sceneWidth <= 0.0f || sceneHeight <= 0.0f) {
         return false;
     }
 
     if (!PointInRect(
         screenPos.x,
         screenPos.y,
-        editorState.sceneViewportScreenX,
-        editorState.sceneViewportScreenY,
-        editorState.sceneViewportScreenWidth,
-        editorState.sceneViewportScreenHeight)) {
+        rectMin.x,
+        rectMin.y,
+        rectSize.x,
+        rectSize.y)) {
         return false;
     }
 
-    const float normalizedX = (screenPos.x - editorState.sceneViewportScreenX) / editorState.sceneViewportScreenWidth;
-    const float normalizedY = (screenPos.y - editorState.sceneViewportScreenY) / editorState.sceneViewportScreenHeight;
-    sceneX = normalizedX * editorState.sceneViewportWidth;
-    sceneY = normalizedY * editorState.sceneViewportHeight;
+    const float normalizedX = (screenPos.x - rectMin.x) / rectSize.x;
+    const float normalizedY = (screenPos.y - rectMin.y) / rectSize.y;
+    sceneX = normalizedX * sceneWidth;
+    sceneY = (1.0f - normalizedY) * sceneHeight;
     return true;
 }
 
@@ -50,6 +56,28 @@ int FindTopmostObjectAt(const SceneState& sceneState, float sceneX, float sceneY
     }
 
     return -1;
+}
+
+void SelectSceneObjectFromMouse(
+    SceneState& sceneState,
+    EditorState& editorState,
+    const ImVec2& imageRectMin,
+    const ImVec2& imageRectSize,
+    const ImVec2& mouseScreenPos) {
+    float sceneX = 0.0f;
+    float sceneY = 0.0f;
+    if (!MapScreenToScenePoint(
+        imageRectMin,
+        imageRectSize,
+        editorState.sceneViewportWidth,
+        editorState.sceneViewportHeight,
+        mouseScreenPos,
+        sceneX,
+        sceneY)) {
+        return;
+    }
+
+    editorState.selectedObjectIndex = FindTopmostObjectAt(sceneState, sceneX, sceneY);
 }
 
 void AssignTextureAssetToObject(SceneState& sceneState, EditorState& editorState, int objectIndex, const AssetRecord& asset) {
@@ -196,11 +224,30 @@ void DrawScenePanel(SceneState& sceneState, EditorState& editorState, const Scen
         editorState.sceneViewportScreenHeight = imageSize.y;
         ImGui::Image((ImTextureID)sceneImage.Handle, imageSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
 
+        const ImVec2 imageRectMin = ImGui::GetItemRectMin();
+        const ImVec2 imageRectMax = ImGui::GetItemRectMax();
+        const ImVec2 imageRectSize(imageRectMax.x - imageRectMin.x, imageRectMax.y - imageRectMin.y);
+        editorState.sceneViewportScreenX = imageRectMin.x;
+        editorState.sceneViewportScreenY = imageRectMin.y;
+        editorState.sceneViewportScreenWidth = imageRectSize.x;
+        editorState.sceneViewportScreenHeight = imageRectSize.y;
+
+        if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            SelectSceneObjectFromMouse(sceneState, editorState, imageRectMin, imageRectSize, ImGui::GetIO().MousePos);
+        }
+
         if (ImGui::BeginDragDropTarget()) {
             int dropTargetIndex = editorState.selectedObjectIndex;
             float sceneX = 0.0f;
             float sceneY = 0.0f;
-            const bool hasScenePoint = MapScreenToScenePoint(editorState, ImGui::GetIO().MousePos, sceneX, sceneY);
+            const bool hasScenePoint = MapScreenToScenePoint(
+                imageRectMin,
+                imageRectSize,
+                editorState.sceneViewportWidth,
+                editorState.sceneViewportHeight,
+                ImGui::GetIO().MousePos,
+                sceneX,
+                sceneY);
             if (hasScenePoint) {
                 const int hoveredObject = FindTopmostObjectAt(sceneState, sceneX, sceneY);
                 if (hoveredObject >= 0) {

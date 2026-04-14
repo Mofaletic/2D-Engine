@@ -3,6 +3,7 @@
 #include "../../frontend/src/editor/EditorActions.h"
 #include "../../frontend/src/editor/EditorUI.h"
 #include "../SceneSerializer.h"
+#include "../core/Instrumentor.h"
 #include "../render/Renderer.h"
 
 #define GLFW_INCLUDE_NONE
@@ -10,6 +11,7 @@
 #include <imgui.h>
 
 #include <chrono>
+#include <exception>
 #include <filesystem>
 
 namespace fs = std::filesystem;
@@ -19,66 +21,81 @@ Engine::Engine() : running(false) {}
 extern void SetupEditorStyle();
 
 bool Engine::init() {
-    WindowSpecification windowSpecification;
-    windowSpecification.Title = "Lancelot Editor";
-    windowSpecification.Width = 1280;
-    windowSpecification.Height = 720;
-    windowSpecification.API = GraphicsAPI::OpenGL;
+    PROFILE_FUNCTION();
 
-    if (!windowManager.Init(windowSpecification)) {
-        return false;
-    }
+    try {
+        PROFILE_BEGIN_SESSION("Lancelot Editor", "out/profiles/lancelot-editor-trace.json");
 
-    Renderer::Init(windowManager.GetGraphicsAPI());
-    Renderer::OnWindowResize(windowManager.GetFramebufferWidth(), windowManager.GetFramebufferHeight());
+        WindowSpecification windowSpecification;
+        windowSpecification.Title = "Lancelot Editor";
+        windowSpecification.Width = 1280;
+        windowSpecification.Height = 720;
+        windowSpecification.Fullscreen = false;
+        windowSpecification.Maximized = true;
+        windowSpecification.API = GraphicsAPI::OpenGL;
 
-    if (!renderer2D.init(windowManager.GetNativeWindow())) {
-        return false;
-    }
-
-    configureResourceSearchPaths();
-
-    if (!imguiLayer.Init(windowManager.GetNativeWindow())) {
-        return false;
-    }
-    ImGui::StyleColorsDark();
-    SetupEditorStyle();
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-    imguiLayer.SetExternalScrollCallback([this](float, float yOffset) {
-        if (!editorState.showScene) {
-            return;
+        if (!windowManager.Init(windowSpecification)) {
+            return false;
         }
 
-        const ImVec2 mousePos = ImGui::GetIO().MousePos;
-        const bool insideViewport =
-            mousePos.x >= editorState.sceneViewportScreenX &&
-            mousePos.y >= editorState.sceneViewportScreenY &&
-            mousePos.x <= editorState.sceneViewportScreenX + editorState.sceneViewportScreenWidth &&
-            mousePos.y <= editorState.sceneViewportScreenY + editorState.sceneViewportScreenHeight;
+        Renderer::Init(windowManager.GetGraphicsAPI());
+        Renderer::OnWindowResize(windowManager.GetFramebufferWidth(), windowManager.GetFramebufferHeight());
 
-        if (insideViewport) {
-            renderer2D.OnMouseScrolled(0.0f, yOffset);
+        if (!renderer2D.init(windowManager.GetNativeWindow())) {
+            return false;
         }
-    });
 
-    const AssetRecord* defaultTexture = editorState.assetRegistry.findByPath("pillar.png");
-    const std::uint64_t defaultTextureId = defaultTexture ? defaultTexture->id : 0;
-    const std::string defaultTexturePath =
-        defaultTexture && !defaultTexture->relativePath.empty() ? defaultTexture->relativePath : "pillar.png";
-    editorState.sceneViewportWidth = static_cast<float>(windowManager.GetFramebufferWidth());
-    editorState.sceneViewportHeight = static_cast<float>(windowManager.GetFramebufferHeight());
-    sceneState.objects.push_back({ 0, "Player", {100.0f, 100.0f}, {1.0f, 1.0f}, 0.0f, defaultTextureId, defaultTexturePath, 0, "" });
-    sceneState.objects.push_back({ 1, "Enemy", {300.0f, 200.0f}, {1.0f, 1.0f}, 0.0f, defaultTextureId, defaultTexturePath, 0, "" });
-    editorState.selectedObjectIndex = 0;
-    editorState.assetStatus = "Create or open a project to import and persist project assets";
-    editorState.sceneFilePath.clear();
-    AddEditorLog(editorState, EditorLogLevel::Info, "Engine initialized.");
+        configureResourceSearchPaths();
 
-    running = true;
-    lastFrameTime = std::chrono::steady_clock::now();
-    return true;
+        if (!imguiLayer.Init(windowManager.GetNativeWindow())) {
+            return false;
+        }
+        ImGui::StyleColorsDark();
+        SetupEditorStyle();
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+        imguiLayer.SetExternalScrollCallback([this](float, float yOffset) {
+            if (!editorState.showScene) {
+                return;
+            }
+
+            const ImVec2 mousePos = ImGui::GetIO().MousePos;
+            const bool insideViewport =
+                mousePos.x >= editorState.sceneViewportScreenX &&
+                mousePos.y >= editorState.sceneViewportScreenY &&
+                mousePos.x <= editorState.sceneViewportScreenX + editorState.sceneViewportScreenWidth &&
+                mousePos.y <= editorState.sceneViewportScreenY + editorState.sceneViewportScreenHeight;
+
+            if (insideViewport) {
+                renderer2D.OnMouseScrolled(0.0f, yOffset);
+            }
+        });
+
+        const AssetRecord* defaultTexture = editorState.assetRegistry.findByPath("pillar.png");
+        const std::uint64_t defaultTextureId = defaultTexture ? defaultTexture->id : 0;
+        const std::string defaultTexturePath =
+            defaultTexture && !defaultTexture->relativePath.empty() ? defaultTexture->relativePath : "pillar.png";
+        editorState.sceneViewportWidth = static_cast<float>(windowManager.GetFramebufferWidth());
+        editorState.sceneViewportHeight = static_cast<float>(windowManager.GetFramebufferHeight());
+        sceneState.objects.push_back({ 0, "Player", {100.0f, 100.0f}, {1.0f, 1.0f}, 0.0f, defaultTextureId, defaultTexturePath, 0, "" });
+        sceneState.objects.push_back({ 1, "Enemy", {300.0f, 200.0f}, {1.0f, 1.0f}, 0.0f, defaultTextureId, defaultTexturePath, 0, "" });
+        sceneState.objects.push_back({ 2, "DebugColorQuad", {540.0f, 180.0f}, {1.25f, 1.25f}, 0.0f, 0, "", 0, "" });
+        editorState.selectedObjectIndex = 0;
+        editorState.assetStatus = "Create or open a project to import and persist project assets";
+        editorState.sceneFilePath.clear();
+        AddEditorLog(editorState, EditorLogLevel::Info, "Engine initialized.");
+
+        running = true;
+        lastFrameTime = std::chrono::steady_clock::now();
+        return true;
+    } catch (const std::exception&) {
+        PROFILE_END_SESSION();
+        return false;
+    } catch (...) {
+        PROFILE_END_SESSION();
+        return false;
+    }
 }
 
 void Engine::handleEditorCommands()
@@ -292,7 +309,11 @@ void Engine::handleProjectCommands() {
 }
 
 void Engine::run() {
+    PROFILE_FUNCTION();
+
     while (running) {
+        PROFILE_SCOPE("Engine::Frame");
+
         const auto frameStart = std::chrono::steady_clock::now();
         const std::chrono::duration<float> frameDuration = frameStart - lastFrameTime;
         lastFrameTime = frameStart;
@@ -326,6 +347,8 @@ void Engine::run() {
 }
 
 void Engine::shutdown() {
+    PROFILE_FUNCTION();
+
     if (!editorState.assetManifestPath.empty()) {
         editorState.assetRegistry.saveManifest(editorState.assetManifestPath);
     }
@@ -335,4 +358,5 @@ void Engine::shutdown() {
     resourceManager.destroy();
     renderer2D.destroy();
     windowManager.Shutdown();
+    PROFILE_END_SESSION();
 }

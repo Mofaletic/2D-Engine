@@ -13,6 +13,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(LANCELOT_ENABLE_PROFILING "Enable lightweight CPU instrumentation and trace output" ON)
+
 find_package(OpenGL REQUIRED)
 
 if (EXISTS "${CMAKE_SOURCE_DIR}/external/SDL/CMakeLists.txt")
@@ -127,4 +129,10 @@ target_link_libraries(LancelotEngine PRIVATE
 
 if (MSVC)
     target_compile_definitions(LancelotEngine PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+
+if (LANCELOT_ENABLE_PROFILING)
+    target_compile_definitions(LancelotEngine PRIVATE LANCELOT_PROFILE_ENABLED=1)
+else()
+    target_compile_definitions(LancelotEngine PRIVATE LANCELOT_PROFILE_ENABLED=0)
 endif()

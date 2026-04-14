@@ -4,6 +4,7 @@
 #include "OrthographicCamera.h"
 #include "RenderCommand.h"
 #include "VertexArray.h"
+#include "../core/Instrumentor.h"
 
 namespace {
 struct SceneData {
@@ -21,10 +22,12 @@ void Renderer::Shutdown() {
 }
 
 void Renderer::BeginScene(const OrthographicCamera& camera) {
+    PROFILE_FUNCTION();
     s_SceneData.ViewProjectionMatrix = camera.GetViewProjectionMatrix();
 }
 
 void Renderer::EndScene() {
+    PROFILE_FUNCTION();
 }
 
 void Renderer::OnWindowResize(unsigned int width, unsigned int height) {
@@ -38,10 +41,18 @@ void Renderer::OnWindowResize(unsigned int width, unsigned int height) {
 void Renderer::Submit(
     const Ref<Material>& material,
     const Ref<VertexArray>& vertexArray,
-    const Transform& transform) {
+    const Matrix4& transform) {
+    PROFILE_FUNCTION();
     material->SetMat4("u_ViewProjection", s_SceneData.ViewProjectionMatrix);
-    material->SetMat4("u_Transform", transform.ToMatrix());
+    material->SetMat4("u_Transform", transform);
     material->Bind();
     vertexArray->Bind();
     RenderCommand::DrawIndexed(*vertexArray);
+}
+
+void Renderer::Submit(
+    const Ref<Material>& material,
+    const Ref<VertexArray>& vertexArray,
+    const Transform& transform) {
+    Submit(material, vertexArray, transform.ToMatrix());
 }

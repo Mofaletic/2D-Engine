@@ -150,6 +150,29 @@ OpenGLTexture2D::OpenGLTexture2D(const std::string& path)
     glGenerateMipmap(GL_TEXTURE_2D);
 }
 
+OpenGLTexture2D::OpenGLTexture2D(unsigned int width, unsigned int height, const void* data)
+    : m_Width(width),
+      m_Height(height) {
+    glGenTextures(1, &m_RendererID);
+    glBindTexture(GL_TEXTURE_2D, m_RendererID);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glTexImage2D(
+        GL_TEXTURE_2D,
+        0,
+        GL_RGBA8,
+        static_cast<int>(m_Width),
+        static_cast<int>(m_Height),
+        0,
+        GL_RGBA,
+        GL_UNSIGNED_BYTE,
+        data);
+}
+
 OpenGLTexture2D::~OpenGLTexture2D() {
     glDeleteTextures(1, &m_RendererID);
 }

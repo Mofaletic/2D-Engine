@@ -2,11 +2,11 @@
 
 #include "Buffer.h"
 #include "Material.h"
-#include "OrthographicCamera.h"
 #include "Renderer.h"
 #include "ShaderLibrary.h"
 #include "Texture.h"
 #include "VertexArray.h"
+#include "../core/Instrumentor.h"
 #include "../core/SceneState.h"
 #include "../resource/ResourceManager.h"
 
@@ -17,55 +17,65 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
-#include <unordered_map>
 #include <stdexcept>
 
 namespace {
-class SimpleTexture2D final : public Texture2D {
-public:
-    SimpleTexture2D(unsigned int rendererId, unsigned int width, unsigned int height, bool owns)
-        : m_RendererID(rendererId), m_Width(width), m_Height(height), m_Owns(owns) {}
-
-    ~SimpleTexture2D() override {
-        if (m_Owns && m_RendererID != 0) {
-            glDeleteTextures(1, &m_RendererID);
-        }
-    }
-
-    unsigned int GetWidth() const override { return m_Width; }
-    unsigned int GetHeight() const override { return m_Height; }
-    void Bind(unsigned int slot) const override {
-        glActiveTexture(GL_TEXTURE0 + slot);
-        glBindTexture(GL_TEXTURE_2D, m_RendererID);
-    }
-
-private:
-    unsigned int m_RendererID = 0;
-    unsigned int m_Width = 0;
-    unsigned int m_Height = 0;
-    bool m_Owns = false;
-};
-
-struct Renderer2DData {
+struct Renderer2DStorage {
     Ref<VertexArray> QuadVertexArray;
     Ref<VertexBuffer> QuadVertexBuffer;
     Ref<IndexBuffer> QuadIndexBuffer;
+    Ref<ShaderLibrary> ShaderLibraryInstance;
     Ref<Material> QuadMaterial;
     Ref<Texture2D> WhiteTexture;
-    std::unordered_map<unsigned int, Ref<Texture2D>> TextureCache;
+    Matrix4 CameraViewProjection = Matrix4::Identity();
+    bool Initialized = false;
 };
 
-Renderer2DData s_Data;
+Renderer2DStorage s_Renderer2DStorage;
+
+std::filesystem::path GetRenderer2DShaderPath() {
+    const std::filesystem::path projectRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path();
+
+    const std::filesystem::path assetsPath = projectRoot / "assets" / "shaders" / "Renderer2D_Quad.glsl";
+    if (std::filesystem::exists(assetsPath)) {
+        return assetsPath;
+    }
+
+    const std::filesystem::path legacyAssetsPath = projectRoot / "asset" / "shaders" / "Renderer2D_Quad.glsl";
+    if (std::filesystem::exists(legacyAssetsPath)) {
+        return legacyAssetsPath;
+    }
+
+    throw std::runtime_error("Renderer2D shader asset was not found.");
+}
+
+Matrix4 CreateQuadTransform(const Vector3& position, const Vector2& size) {
+    return Matrix4::Translation(position.x, position.y, position.z)
+        * Matrix4::Scale(size.x, size.y, 1.0f);
+}
+
+void SubmitQuad(const Matrix4& transform, const Ref<Texture2D>& texture, const Vector4& tintColor, float tilingFactor) {
+    PROFILE_SCOPE("Renderer2D::DrawQuadInternal");
+
+    if (!s_Renderer2DStorage.Initialized || s_Renderer2DStorage.QuadMaterial == nullptr) {
+        throw std::runtime_error("Renderer2D::Init must be called before DrawQuad.");
+    }
+
+    s_Renderer2DStorage.QuadMaterial->SetTexture(
+        "u_Texture",
+        texture != nullptr ? texture : s_Renderer2DStorage.WhiteTexture,
+        0);
+    s_Renderer2DStorage.QuadMaterial->SetFloat4("u_Color", tintColor);
+    s_Renderer2DStorage.QuadMaterial->SetFloat("u_TilingFactor", tilingFactor);
+    Renderer::Submit(s_Renderer2DStorage.QuadMaterial, s_Renderer2DStorage.QuadVertexArray, transform);
+}
 }
 
 bool Renderer2D::init(GLFWwindow* window) {
-    m_Window = window;
-    const std::filesystem::path projectRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path();
-    const std::filesystem::path shaderPath = projectRoot / "assets" / "shaders" / "Renderer2D_Quad.glsl";
+    PROFILE_FUNCTION();
 
-    m_ShaderLibrary = CreateRef<ShaderLibrary>();
-    m_ShaderLibrary->Load("Renderer2D_Quad", shaderPath.string());
-    Renderer2D::Init(m_ShaderLibrary);
+    m_Window = window;
+    Renderer2D::Init();
     m_CameraInitialized = false;
     createSceneRenderTarget();
     m_InstanceInitialized = true;
@@ -73,10 +83,12 @@ bool Renderer2D::init(GLFWwindow* window) {
 }
 
 void Renderer2D::destroy() {
+    PROFILE_FUNCTION();
+
     destroySceneRenderTarget();
     if (m_InstanceInitialized) {
         Renderer2D::Shutdown();
-        m_ShaderLibrary.reset();
+        m_TextureCache.clear();
         m_InstanceInitialized = false;
     }
 }
@@ -97,7 +109,8 @@ void Renderer2D::resizeSceneRenderTarget(int width, int height) {
 }
 
 void Renderer2D::renderScene(const SceneState& sceneState, ResourceManager& resourceManager, float deltaSeconds) {
-    static_cast<void>(resourceManager);
+    PROFILE_FUNCTION();
+
     if (!m_InstanceInitialized || m_SceneFramebuffer == 0) {
         return;
     }
@@ -127,13 +140,12 @@ void Renderer2D::renderScene(const SceneState& sceneState, ResourceManager& reso
     m_SceneCamera.SetPosition(m_CameraPositionX, m_CameraPositionY, 0.0f);
     m_SceneCamera.SetRotation(m_CameraRotation);
 
-    Renderer2D::BeginScene(m_SceneCamera);
-    for (std::size_t index = 0; index < sceneState.objects.size(); ++index) {
-        const GameObject& object = sceneState.objects[index];
-
-        Transform transform;
+    BeginScene(m_SceneCamera);
+    for (const GameObject& object : sceneState.objects) {
         const float width = 64.0f * std::max(object.scale[0], 0.0f);
         const float height = 64.0f * std::max(object.scale[1], 0.0f);
+
+        Transform transform;
         transform.Translation = {
             object.position[0] + width * 0.5f,
             object.position[1] + height * 0.5f,
@@ -142,35 +154,17 @@ void Renderer2D::renderScene(const SceneState& sceneState, ResourceManager& reso
         transform.Rotation = { 0.0f, 0.0f, object.rotation * 0.01745329252f };
         transform.Scale = { width, height, 1.0f };
 
-        Vector4 color{ 1.0f, 1.0f, 1.0f, 1.0f };
         if (!object.texturePath.empty()) {
-            if (const TextureResourceInfo* textureInfo = resourceManager.getTexture(object.texturePath)) {
-                const unsigned int rendererId = textureInfo->rendererId;
-                if (rendererId != 0) {
-                    auto found = s_Data.TextureCache.find(rendererId);
-                    if (found == s_Data.TextureCache.end()) {
-                        auto wrapped = CreateRef<SimpleTexture2D>(
-                            rendererId,
-                            static_cast<unsigned int>(textureInfo->width),
-                            static_cast<unsigned int>(textureInfo->height),
-                            false);
-                        found = s_Data.TextureCache.emplace(rendererId, wrapped).first;
-                    }
-                    s_Data.QuadMaterial->SetTexture("u_Texture", found->second, 0);
-                } else {
-                    s_Data.QuadMaterial->SetTexture("u_Texture", s_Data.WhiteTexture, 0);
-                }
-            } else {
-                s_Data.QuadMaterial->SetTexture("u_Texture", s_Data.WhiteTexture, 0);
+            const std::string resolvedPath = resourceManager.resolveTexturePath(object.texturePath);
+            if (!resolvedPath.empty()) {
+                DrawQuad(transform, GetOrLoadTexture(resolvedPath), { 1.0f, 1.0f, 1.0f, 1.0f });
+                continue;
             }
-        } else {
-            s_Data.QuadMaterial->SetTexture("u_Texture", s_Data.WhiteTexture, 0);
         }
 
-        s_Data.QuadMaterial->SetFloat4("u_Color", color);
-        Renderer::Submit(s_Data.QuadMaterial, s_Data.QuadVertexArray, transform);
+        DrawQuad(transform, { 0.85f, 0.3f, 0.2f, 1.0f });
     }
-    Renderer2D::EndScene();
+    EndScene();
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -183,71 +177,141 @@ SceneViewportImage Renderer2D::getSceneViewportImage() const {
     return image;
 }
 
+void Renderer2D::Init() {
+    PROFILE_FUNCTION();
+
+    auto shaderLibrary = CreateRef<ShaderLibrary>();
+    shaderLibrary->Load("Renderer2D_Quad", GetRenderer2DShaderPath().string());
+    Init(shaderLibrary);
+}
+
 void Renderer2D::Init(const Ref<ShaderLibrary>& shaderLibrary, const std::string& shaderName) {
-    const float vertices[] = {
+    PROFILE_FUNCTION();
+
+    if (s_Renderer2DStorage.Initialized) {
+        return;
+    }
+
+    const float quadVertices[] = {
         -0.5f, -0.5f, 0.0f,  0.0f, 0.0f,
          0.5f, -0.5f, 0.0f,  1.0f, 0.0f,
          0.5f,  0.5f, 0.0f,  1.0f, 1.0f,
         -0.5f,  0.5f, 0.0f,  0.0f, 1.0f
     };
 
-    const unsigned int indices[] = { 0, 1, 2, 2, 3, 0 };
+    const unsigned int quadIndices[] = { 0, 1, 2, 2, 3, 0 };
+    const unsigned int whitePixel = 0xffffffff;
 
-    s_Data.QuadVertexArray = VertexArray::Create();
-    s_Data.QuadVertexBuffer = VertexBuffer::Create(vertices, sizeof(vertices));
-    s_Data.QuadVertexBuffer->SetLayout({
+    s_Renderer2DStorage.QuadVertexArray = VertexArray::Create();
+    s_Renderer2DStorage.QuadVertexBuffer = VertexBuffer::Create(quadVertices, sizeof(quadVertices));
+    s_Renderer2DStorage.QuadVertexBuffer->SetLayout({
         { ShaderDataType::Float3, "a_Position" },
         { ShaderDataType::Float2, "a_TexCoord" }
     });
-    s_Data.QuadIndexBuffer = IndexBuffer::Create(indices, 6);
+    s_Renderer2DStorage.QuadIndexBuffer = IndexBuffer::Create(quadIndices, 6);
 
-    s_Data.QuadVertexArray->AddVertexBuffer(s_Data.QuadVertexBuffer);
-    s_Data.QuadVertexArray->SetIndexBuffer(s_Data.QuadIndexBuffer);
+    s_Renderer2DStorage.QuadVertexArray->AddVertexBuffer(s_Renderer2DStorage.QuadVertexBuffer);
+    s_Renderer2DStorage.QuadVertexArray->SetIndexBuffer(s_Renderer2DStorage.QuadIndexBuffer);
 
-    s_Data.QuadMaterial = CreateRef<Material>(shaderLibrary->Get(shaderName));
-
-    unsigned int whiteTexture = 0;
-    glGenTextures(1, &whiteTexture);
-    glBindTexture(GL_TEXTURE_2D, whiteTexture);
-    const unsigned int whitePixel = 0xffffffff;
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, &whitePixel);
-    s_Data.WhiteTexture = CreateRef<SimpleTexture2D>(whiteTexture, 1, 1, true);
-
-    s_Data.QuadMaterial->SetTexture("u_Texture", s_Data.WhiteTexture, 0);
-    s_Data.QuadMaterial->SetFloat4("u_Color", { 1.0f, 1.0f, 1.0f, 1.0f });
+    s_Renderer2DStorage.ShaderLibraryInstance = shaderLibrary;
+    s_Renderer2DStorage.QuadMaterial = CreateRef<Material>(shaderLibrary->Get(shaderName));
+    s_Renderer2DStorage.WhiteTexture = Texture2D::Create(1, 1, &whitePixel);
+    s_Renderer2DStorage.QuadMaterial->SetTexture("u_Texture", s_Renderer2DStorage.WhiteTexture, 0);
+    s_Renderer2DStorage.QuadMaterial->SetFloat4("u_Color", { 1.0f, 1.0f, 1.0f, 1.0f });
+    s_Renderer2DStorage.QuadMaterial->SetFloat("u_TilingFactor", 1.0f);
+    s_Renderer2DStorage.Initialized = true;
 }
 
 void Renderer2D::Shutdown() {
-    s_Data.QuadMaterial.reset();
-    s_Data.QuadIndexBuffer.reset();
-    s_Data.QuadVertexBuffer.reset();
-    s_Data.QuadVertexArray.reset();
-    s_Data.WhiteTexture.reset();
-    s_Data.TextureCache.clear();
+    PROFILE_FUNCTION();
+
+    s_Renderer2DStorage.QuadMaterial.reset();
+    s_Renderer2DStorage.ShaderLibraryInstance.reset();
+    s_Renderer2DStorage.QuadIndexBuffer.reset();
+    s_Renderer2DStorage.QuadVertexBuffer.reset();
+    s_Renderer2DStorage.QuadVertexArray.reset();
+    s_Renderer2DStorage.WhiteTexture.reset();
+    s_Renderer2DStorage.CameraViewProjection = Matrix4::Identity();
+    s_Renderer2DStorage.Initialized = false;
 }
 
 void Renderer2D::BeginScene(const OrthographicCamera& camera) {
+    PROFILE_FUNCTION();
+
+    s_Renderer2DStorage.CameraViewProjection = camera.GetViewProjectionMatrix();
     Renderer::BeginScene(camera);
 }
 
 void Renderer2D::EndScene() {
+    PROFILE_FUNCTION();
+
     Renderer::EndScene();
 }
 
+void Renderer2D::DrawQuad(const Vector2& position, const Vector2& size, const Vector4& color) {
+    DrawQuad(Vector3{ position.x, position.y, 0.0f }, size, color);
+}
+
+void Renderer2D::DrawQuad(const Vector3& position, const Vector2& size, const Vector4& color) {
+    DrawQuad(CreateQuadTransform(position, size), color);
+}
+
+void Renderer2D::DrawQuad(const Matrix4& transform, const Vector4& color) {
+    SubmitQuad(transform, s_Renderer2DStorage.WhiteTexture, color, 1.0f);
+}
+
 void Renderer2D::DrawQuad(const Transform& transform, const Vector4& color) {
-    s_Data.QuadMaterial->SetFloat4("u_Color", color);
-    Renderer::Submit(s_Data.QuadMaterial, s_Data.QuadVertexArray, transform);
+    DrawQuad(transform.ToMatrix(), color);
 }
 
 void Renderer2D::DrawQuad(const Vector3& position, const Vector3& size, const Vector4& color) {
-    Transform transform;
-    transform.Translation = position;
-    transform.Scale = size;
-    DrawQuad(transform, color);
+    DrawQuad(position, Vector2{ size.x, size.y }, color);
+}
+
+void Renderer2D::DrawQuad(const Vector2& position, const Vector2& size, const Ref<Texture2D>& texture) {
+    DrawQuad(position, size, texture, { 1.0f, 1.0f, 1.0f, 1.0f });
+}
+
+void Renderer2D::DrawQuad(const Vector3& position, const Vector2& size, const Ref<Texture2D>& texture) {
+    DrawQuad(position, size, texture, { 1.0f, 1.0f, 1.0f, 1.0f });
+}
+
+void Renderer2D::DrawQuad(const Matrix4& transform, const Ref<Texture2D>& texture) {
+    DrawQuad(transform, texture, { 1.0f, 1.0f, 1.0f, 1.0f });
+}
+
+void Renderer2D::DrawQuad(
+    const Vector2& position,
+    const Vector2& size,
+    const Ref<Texture2D>& texture,
+    const Vector4& tintColor,
+    float tilingFactor) {
+    DrawQuad(Vector3{ position.x, position.y, 0.0f }, size, texture, tintColor, tilingFactor);
+}
+
+void Renderer2D::DrawQuad(
+    const Vector3& position,
+    const Vector2& size,
+    const Ref<Texture2D>& texture,
+    const Vector4& tintColor,
+    float tilingFactor) {
+    DrawQuad(CreateQuadTransform(position, size), texture, tintColor, tilingFactor);
+}
+
+void Renderer2D::DrawQuad(
+    const Matrix4& transform,
+    const Ref<Texture2D>& texture,
+    const Vector4& tintColor,
+    float tilingFactor) {
+    SubmitQuad(transform, texture, tintColor, tilingFactor);
+}
+
+void Renderer2D::DrawQuad(
+    const Transform& transform,
+    const Ref<Texture2D>& texture,
+    const Vector4& tintColor,
+    float tilingFactor) {
+    DrawQuad(transform.ToMatrix(), texture, tintColor, tilingFactor);
 }
 
 void Renderer2D::OnMouseScrolled(float xOffset, float yOffset) {
@@ -335,4 +399,17 @@ void Renderer2D::updateCamera(float deltaSeconds) {
     if (glfwGetKey(m_Window, GLFW_KEY_E) == GLFW_PRESS) {
         m_CameraRotation -= m_CameraRotationSpeed * deltaSeconds;
     }
+}
+
+Ref<Texture2D> Renderer2D::GetOrLoadTexture(const std::string& resolvedPath) {
+    PROFILE_FUNCTION();
+
+    const auto found = m_TextureCache.find(resolvedPath);
+    if (found != m_TextureCache.end()) {
+        return found->second;
+    }
+
+    auto texture = Texture2D::Create(resolvedPath);
+    m_TextureCache.emplace(resolvedPath, texture);
+    return texture;
 }

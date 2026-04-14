@@ -45,6 +45,11 @@ bool WindowManager::Init(const WindowSpecification& specification) {
 
     m_Context = GraphicsContext::Create(m_Window, m_Specification.API);
     m_Context->Init();
+    if (m_Specification.Fullscreen) {
+        ToggleFullscreen();
+    } else if (m_Specification.Maximized) {
+        glfwMaximizeWindow(m_Window);
+    }
     int framebufferWidth = 0;
     int framebufferHeight = 0;
     glfwGetFramebufferSize(m_Window, &framebufferWidth, &framebufferHeight);

@@ -13,6 +13,8 @@ struct WindowSpecification {
     std::string Title = "Lancelot Engine";
     unsigned int Width = 1280;
     unsigned int Height = 720;
+    bool Fullscreen = false;
+    bool Maximized = false;
     bool VSync = true;
     GraphicsAPI API = GraphicsAPI::OpenGL;
 };

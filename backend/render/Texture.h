@@ -17,4 +17,5 @@ public:
 class Texture2D : public Texture {
 public:
     static Ref<Texture2D> Create(const std::string& path);
+    static Ref<Texture2D> Create(unsigned int width, unsigned int height, const void* data);
 };

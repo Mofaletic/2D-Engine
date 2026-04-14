@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>引擎完成度总结与任务计划（计算机设计大赛用）</title>
+  <style>
+    body { font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif; line-height: 1.6; color: #111; }
+    h1, h2, h3 { margin: 0.8em 0 0.4em; }
+    p { margin: 0.4em 0; }
+    ul { margin: 0.3em 0 0.6em 1.2em; }
+    table { border-collapse: collapse; width: 100%; margin: 0.6em 0 1.2em; }
+    th, td { border: 1px solid #444; padding: 6px 8px; vertical-align: top; }
+    th { background: #f0f0f0; }
+    .small { font-size: 12px; color: #333; }
+  </style>
+</head>
+<body>
+  <h1>引擎完成度总结与任务计划</h1>
+  <p class="small">用途：计算机设计大赛（软件应用与开发 / 算法设计与应用）材料</p>
+
+  <h2>一、项目定位与参赛核心卖点</h2>
+  <p>本项目为 2D 引擎与编辑器一体化系统，当前重点体现“算法设计与应用”方向的工程实现能力与可扩展架构能力，包含：</p>
+  <ul>
+    <li>分层渲染架构（Renderer → RenderCommand → RendererAPI → OpenGL 后端）</li>
+    <li>资源管线与 Shader 资产化（单文件多阶段 Shader 格式）</li>
+    <li>Scene 视口嵌入式渲染（ImGui 编辑器中内嵌 OpenGL Scene Viewport）</li>
+    <li>可交互视图控制（WASD 移动 / QE 旋转 / 滚轮缩放）</li>
+    <li>可扩展性基础（Renderer2D 骨架、Material/Transform/Texture 抽象）</li>
+  </ul>
+
+  <h2>二、已完成内容（Done）</h2>
+  <h3>1. 渲染架构与资源抽象</h3>
+  <ul>
+    <li>Renderer / RenderCommand / RendererAPI 分层结构完成</li>
+    <li>OpenGLRendererAPI 后端实现完成</li>
+    <li>Buffer / VertexArray / Shader 抽象完成（API 无关接口）</li>
+    <li>BufferLayout / ShaderDataType 完成，可描述顶点输入布局</li>
+    <li>OrthographicCamera 及 BeginScene/Submit/EndScene 流程完成</li>
+  </ul>
+
+  <h3>2. Shader 资产化与 ShaderLibrary</h3>
+  <ul>
+    <li>支持单文件多阶段 Shader（#type vertex / #type fragment）</li>
+    <li>ShaderLibrary 实现 Add/Load/Get/Exists</li>
+    <li>避免硬编码 GLSL 字符串</li>
+  </ul>
+
+  <h3>3. Renderer2D 骨架与 Scene 嵌入</h3>
+  <ul>
+    <li>Renderer2D API 骨架已建立</li>
+    <li>Scene 视口渲染 FBO 管线完成，嵌入 ImGui Scene Panel</li>
+    <li>Scene 背景统一设置为纯黑</li>
+  </ul>
+
+  <h3>4. 交互与可用性</h3>
+  <ul>
+    <li>WASD / QE / 鼠标滚轮控制 Scene 视图</li>
+    <li>窗口 resize / 最小化安全处理已加入</li>
+    <li>Scene Panel 交互逻辑可用（选中、拖拽对象）</li>
+  </ul>
+
+  <h3>5. 纹理系统</h3>
+  <ul>
+    <li>Texture2D 抽象完成</li>
+    <li>OpenGLTexture2D 实现</li>
+    <li>Material 支持纹理绑定与采样</li>
+    <li>拖拽图片可真实渲染，不再是纯色块</li>
+  </ul>
+
+  <h2>三、核心算法设计与应用亮点（可用于参赛描述）</h2>
+  <ul>
+    <li>多阶段 Shader 资产解析算法：单文件解析并拆分渲染阶段，提高可维护性</li>
+    <li>Scene Viewport FBO 嵌入算法：离屏渲染 → ImGui Texture 映射展示</li>
+    <li>统一渲染提交流：Transform 与 ViewProjection 的组合提交路径</li>
+    <li>交互式视图控制算法：实时计算投影与缩放，驱动场景视图变化</li>
+    <li>资源路径解析与纹理缓存策略（ResourceManager + 纹理缓存）</li>
+  </ul>
+
+  <h2>四、尚需完成内容（Todo / In Progress）</h2>
+  <h3>1. 渲染与编辑器功能完善</h3>
+  <ul>
+    <li>Renderer2D 扩展为轻量批处理（Batching）</li>
+    <li>纹理坐标 / Sprite 渲染流程稳定化</li>
+    <li>Scene 视口选择框、Gizmo 或基础操控工具</li>
+  </ul>
+
+  <h3>2. 资源与工程系统</h3>
+  <ul>
+    <li>基础资源浏览 / 预览与导入增强</li>
+    <li>材质系统扩展（更多 uniform / 贴图）</li>
+    <li>可选：SubTexture / Atlas 支持</li>
+  </ul>
+
+  <h3>3. 展示与比赛材料</h3>
+  <ul>
+    <li>输出展示 Demo 场景</li>
+    <li>整理算法设计说明文档与技术路线图</li>
+    <li>展示视频或动态截图</li>
+  </ul>
+
+  <h2>五、任务计划表（建议）</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>阶段</th>
+        <th>任务内容</th>
+        <th>交付物</th>
+        <th>负责人建议</th>
+        <th>预计工期</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>阶段 1</td>
+        <td>Renderer2D 轻量批处理与纹理渲染优化</td>
+        <td>批处理版 Renderer2D + demo scene</td>
+        <td>渲染开发</td>
+        <td>1~2 周</td>
+      </tr>
+      <tr>
+        <td>阶段 2</td>
+        <td>Scene 交互工具完善（选择框 / 基础 Gizmo）</td>
+        <td>可拖拽/缩放/旋转的 Scene 编辑操作</td>
+        <td>编辑器开发</td>
+        <td>1~2 周</td>
+      </tr>
+      <tr>
+        <td>阶段 3</td>
+        <td>资源系统增强（素材预览 / 导入 / 材质扩展）</td>
+        <td>稳定的素材导入与预览流程</td>
+        <td>资源与UI开发</td>
+        <td>1~2 周</td>
+      </tr>
+      <tr>
+        <td>阶段 4</td>
+        <td>项目展示与竞赛材料整理</td>
+        <td>PPT / 说明文档 / Demo 视频</td>
+        <td>全员协作</td>
+        <td>1 周</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>六、建议展示方式</h2>
+  <ul>
+    <li>展示 Scene 视口中可拖拽对象、纹理渲染、缩放与旋转视角</li>
+    <li>强调 Shader 资产化、Renderer2D 分层结构和 Scene FBO 嵌入技术路线</li>
+    <li>突出“算法设计与应用”：视口映射、投影矩阵、批处理优化路径</li>
+  </ul>
+
+  <p class="small">如需进一步细化任务拆解、里程碑排期或补充算法说明/流程图，可继续提出。</p>
+</body>
+</html>

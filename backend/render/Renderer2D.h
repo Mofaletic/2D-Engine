@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 
 #include "../core/Ref.h"
 #include "Math.h"
@@ -8,10 +9,10 @@
 #include "SceneViewportImage.h"
 
 struct GLFWwindow;
-class OrthographicCamera;
 struct SceneState;
 class ResourceManager;
 class ShaderLibrary;
+class Texture2D;
 
 class Renderer2D {
 public:
@@ -23,22 +24,55 @@ public:
     SceneViewportImage getSceneViewportImage() const;
     void OnMouseScrolled(float xOffset, float yOffset);
 
+    static void Init();
     static void Init(const Ref<ShaderLibrary>& shaderLibrary, const std::string& shaderName = "Renderer2D_Quad");
     static void Shutdown();
     static void BeginScene(const OrthographicCamera& camera);
     static void EndScene();
+
+    static void DrawQuad(const Vector2& position, const Vector2& size, const Vector4& color);
+    static void DrawQuad(const Vector3& position, const Vector2& size, const Vector4& color);
+    static void DrawQuad(const Matrix4& transform, const Vector4& color);
     static void DrawQuad(const Transform& transform, const Vector4& color);
     static void DrawQuad(const Vector3& position, const Vector3& size, const Vector4& color);
+
+    static void DrawQuad(const Vector2& position, const Vector2& size, const Ref<Texture2D>& texture);
+    static void DrawQuad(const Vector3& position, const Vector2& size, const Ref<Texture2D>& texture);
+    static void DrawQuad(const Matrix4& transform, const Ref<Texture2D>& texture);
+
+    static void DrawQuad(
+        const Vector2& position,
+        const Vector2& size,
+        const Ref<Texture2D>& texture,
+        const Vector4& tintColor,
+        float tilingFactor = 1.0f);
+    static void DrawQuad(
+        const Vector3& position,
+        const Vector2& size,
+        const Ref<Texture2D>& texture,
+        const Vector4& tintColor,
+        float tilingFactor = 1.0f);
+    static void DrawQuad(
+        const Matrix4& transform,
+        const Ref<Texture2D>& texture,
+        const Vector4& tintColor,
+        float tilingFactor = 1.0f);
+    static void DrawQuad(
+        const Transform& transform,
+        const Ref<Texture2D>& texture,
+        const Vector4& tintColor,
+        float tilingFactor = 1.0f);
 
 private:
     void createSceneRenderTarget();
     void destroySceneRenderTarget();
     void updateCamera(float deltaSeconds);
+    Ref<Texture2D> GetOrLoadTexture(const std::string& resolvedPath);
 
 private:
     GLFWwindow* m_Window = nullptr;
-    Ref<ShaderLibrary> m_ShaderLibrary;
     OrthographicCamera m_SceneCamera{ 0.0f, 1.0f, 1.0f, 0.0f };
+    std::unordered_map<std::string, Ref<Texture2D>> m_TextureCache;
     unsigned int m_SceneFramebuffer = 0;
     unsigned int m_SceneColorAttachment = 0;
     unsigned int m_SceneDepthAttachment = 0;

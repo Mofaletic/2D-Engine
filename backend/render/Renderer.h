@@ -18,6 +18,11 @@ public:
     static void Submit(
         const Ref<Material>& material,
         const Ref<VertexArray>& vertexArray,
+        const Matrix4& transform
+    );
+    static void Submit(
+        const Ref<Material>& material,
+        const Ref<VertexArray>& vertexArray,
         const Transform& transform = Transform{}
     );
 };

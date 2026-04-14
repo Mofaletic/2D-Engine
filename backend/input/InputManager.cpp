@@ -54,7 +54,7 @@ bool MapScreenToScenePoint(
         : 0.0f;
 
     sceneX = normalizedX * editorState.sceneViewportWidth;
-    sceneY = normalizedY * editorState.sceneViewportHeight;
+    sceneY = (1.0f - normalizedY) * editorState.sceneViewportHeight;
     return true;
 }
 
@@ -123,12 +123,13 @@ void InputManager::processEvents(WindowManager& windowManager, SceneState& scene
     }
     m_PreviousResize3Pressed = resize3Pressed;
 
-    double mouseX = 0.0;
-    double mouseY = 0.0;
-    glfwGetCursorPos(nativeWindow, &mouseX, &mouseY);
+    const ImVec2 mousePos = ImGui::GetIO().MousePos;
+    const float mouseX = mousePos.x;
+    const float mouseY = mousePos.y;
 
     const bool leftMousePressed = glfwGetMouseButton(nativeWindow, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
-    if (leftMousePressed && !m_PreviousLeftMousePressed) {
+    const bool imguiCapturingMouse = ImGui::GetIO().WantCaptureMouse;
+    if (!imguiCapturingMouse && leftMousePressed && !m_PreviousLeftMousePressed) {
         float sceneX = 0.0f;
         float sceneY = 0.0f;
         const bool insideSceneViewport = MapScreenToScenePoint(
@@ -157,7 +158,8 @@ void InputManager::processEvents(WindowManager& windowManager, SceneState& scene
         }
     }
 
-    if (leftMousePressed &&
+    if (!imguiCapturingMouse &&
+        leftMousePressed &&
         editorState.isDraggingSceneObject &&
         editorState.draggingObjectIndex >= 0 &&
         editorState.draggingObjectIndex < static_cast<int>(sceneState.objects.size())) {
@@ -168,6 +170,10 @@ void InputManager::processEvents(WindowManager& windowManager, SceneState& scene
             object.position[0] = sceneX - editorState.sceneDragOffsetX;
             object.position[1] = sceneY - editorState.sceneDragOffsetY;
         }
+    }
+
+    if (imguiCapturingMouse && !leftMousePressed) {
+        StopSceneDrag(editorState);
     }
 
     if (!leftMousePressed && m_PreviousLeftMousePressed) {
