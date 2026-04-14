@@ -1,265 +1,244 @@
-﻿# 轻量级 2D 游戏引擎与可视化编辑工具
+# LancelotEngine
 
-> A lightweight 2D game engine and editor prototype built with C++, SDL3 and Dear ImGui.
+> A lightweight 2D engine and editor prototype built around C++, OpenGL and Dear ImGui.
 
-本项目面向轻量级 2D 原型验证场景，目标是实现一套可持续扩展的“引擎内核 + 编辑器原型 + 样例验证”工具链，而不是单独完成一个游戏 Demo。
+本仓库当前以 `master` 分支为主线，定位是一个面向课程设计与原型验证的轻量级二维引擎项目。  
+它不是成熟商用引擎，而是一个正在持续迭代的 `引擎底层 + 可视化编辑器 + 项目管理` 原型。
 
-当前仓库处于原型开发阶段，已经完成基础运行主链路和一版可交互编辑器原型，后续将继续补齐碰撞、Demo、导出和项目管理能力。
+## Status
+
+当前状态：`Active development`
+
+主线已经具备这些核心方向的基础实现：
+
+- OpenGL 渲染抽象层与 2D 渲染骨架
+- 基于 ImGui 的编辑器工作区
+- Scene 视口渲染到编辑器面板
+- Project 面板驱动的项目与资源管理
+- 资源导入、资产清单、场景保存加载
+- 原生 C++ 脚本的运行时编译与绑定雏形
+
+目前仍然是原型阶段，很多能力已经起步，但还没有形成完整的游戏引擎闭环。
 
 ## Overview
 
-这个项目的核心方向是：
+项目当前采用“后端引擎 + 前端编辑器”的结构：
 
-- 自研轻量级 2D 游戏引擎
-- 基于 ImGui 的可视化编辑工具原型
-- 面向课程设计 / 比赛项目 / 原型验证
-- 通过平台跳跃类样例验证引擎能力
+- `backend/` 负责窗口、渲染、资源、项目、脚本、场景等运行时能力
+- `frontend/` 负责基于 Dear ImGui 的编辑器界面
+- `main.cpp` 启动 `Engine`
+- `Engine` 串联窗口、渲染器、ImGui、项目状态、资源系统与编辑器命令流
 
-相比大型商业引擎，这个项目更强调：
+从技术实现上看，这条主线不是 SDL Renderer 方案，而是：
 
-- 结构清晰
-- 便于理解
-- 轻量可控
-- 适合做底层学习和原型验证
+- `GLFW + GLAD + OpenGL` 负责窗口上下文与渲染
+- `Dear ImGui` 负责编辑器 UI
+- `SDL3 + SDL3_image` 当前主要用于图像加载与部分平台辅助能力
+- `nlohmann/json` 负责场景与项目相关序列化
 
-## Current Status
+## Current Capabilities
 
-当前已完成：
+当前代码里已经能对应到的能力包括：
 
-- SDL3 窗口初始化、销毁、尺寸调整、全屏切换
-- 基础 2D 渲染主链路
-- 输入事件循环
-- 基于路径的纹理缓存加载
-- 场景对象与编辑器状态管理
-- ImGui Docking 编辑器主界面
-- Hierarchy / Scene / Inspector / Project / Console 面板
-- Play / Pause / Stop 编辑器命令流
-- 场景 JSON 保存与加载
-
-当前开发中：
-
-- 固定时间步长与更完整的游戏循环
-- 更标准的输入状态系统
-- 对象 / 精灵 / 组件抽象
-- 碰撞检测与平台跳跃逻辑
-- 资源导入与真实资源浏览
-- 项目管理与导出链路
-- 平台跳跃样例 Demo
+- `Renderer / RendererAPI / RenderCommand / OpenGL backend`
+- `VertexBuffer / IndexBuffer / VertexArray / Shader / Material / Texture2D`
+- 正交相机与 2D Quad 提交链路
+- Scene 视口 FBO 渲染，并在 ImGui 面板中显示
+- Scene 视口相机控制：`W A S D` 平移，`Q E` 旋转，滚轮缩放
+- 层级面板、属性面板、场景面板、项目面板、控制台面板
+- Play / Pause / Stop 编辑器模式切换
+- 对象创建、删除、选择、拖拽移动、属性修改
+- 场景保存 / 加载
+- 资产导入、资产注册表、项目资源同步
+- 项目创建 / 打开 / 基础文件管理
+- 纹理资源拖拽到场景对象
+- 脚本资源绑定到对象
+- Windows 下原生 C++ 脚本运行时编译与动态加载雏形
 
 ## Tech Stack
 
-- C++20
-- SDL3
-- SDL3_image
-- Dear ImGui
-- nlohmann/json
-- CMake
-- Ninja
-- Visual Studio 2022
+- `C++20`
+- `OpenGL`
+- `GLFW`
+- `GLAD`
+- `Dear ImGui`
+- `SDL3`
+- `SDL3_image`
+- `nlohmann/json`
+- `CMake`
+- `Ninja`
+- `Visual Studio 2022`
 
-## Project Structure
+## Repository Layout
 
 ```text
 2D-Engine/
-├─ asset/                         # 项目资源
-├─ backend/                       # 引擎后端
-│  ├─ core/                       # Engine / GameLoop / SceneState
-│  ├─ input/                      # 输入系统
-│  ├─ render/                     # 2D 渲染
-│  ├─ resource/                   # 资源管理
-│  ├─ window/                     # 窗口管理
-│  ├─ SceneSerializer.cpp
-│  └─ SceneSerializer.h
-├─ frontend/                      # 编辑器前端
+├─ app/                          # 编辑器侧控制器与上层应用逻辑
+├─ asset/                        # 当前仓库中的示例资源
+├─ backend/
+│  ├─ core/                      # Engine / GameLoop / SceneState / Ref / Timestep
+│  ├─ input/                     # 输入处理
+│  ├─ platform/
+│  │  ├─ imgui/                  # 自定义 ImGui 平台/渲染后端接入
+│  │  └─ opengl/                 # OpenGL 具体实现
+│  ├─ project/                   # 项目创建、打开、文件操作
+│  ├─ render/                    # 渲染抽象层与 Renderer2D
+│  ├─ resource/                  # ResourceManager / AssetRegistry / 路径处理
+│  ├─ script/                    # 原生脚本运行时
+│  ├─ window/                    # GLFW 窗口管理
+│  ├─ SceneSerializer.*
+│  └─ ...
+├─ docs/                         # 阶段文档与里程碑说明
+├─ external/                     # 第三方依赖
+│  ├─ SDL/
+│  ├─ SDL_image/
+│  ├─ glad/
+│  ├─ glfw/
+│  ├─ imgui/
+│  └─ json-develop/
+├─ frontend/
 │  └─ src/
 │     ├─ EditorState.h
 │     └─ editor/
-│        ├─ EditorUI.cpp
-│        ├─ EditorUI.h
+│        ├─ EditorUI.*
 │        └─ Panels/
-├─ external/                      # 第三方依赖
-│  ├─ SDL/
-│  ├─ SDL_image/
-│  ├─ imgui/
-│  └─ json-develop/
 ├─ include/
-├─ main.cpp
 ├─ CMakeLists.txt
-└─ CMakePresets.json
+├─ CMakePresets.json
+└─ main.cpp
 ```
 
-## Architecture
-
-当前项目采用“后端引擎 + 前端编辑器”的组织方式：
-
-1. `main.cpp` 创建并启动 `Engine`
-2. `backend/core/Engine` 串联窗口、渲染、输入、资源、场景与编辑器状态
-3. `backend/*` 提供运行时基础能力
-4. `frontend/src/editor/*` 提供基于 ImGui 的编辑器界面
-5. `backend/SceneSerializer` 负责场景 JSON 序列化
-
-当前编辑器已经具备最小交互闭环：
-
-- 在 `Hierarchy` 选择对象
-- 在 `Inspector` 修改对象位置、缩放和贴图路径
-- 在 `Project` 面板切换对象贴图
-- 在 `Scene` 面板增删对象、保存 / 加载场景
-- 通过工具栏触发 `Play / Pause / Stop`
-
-## Quick Start
+## Build
 
 ### Requirements
 
 - Windows 10 / 11
 - Visual Studio 2022
-- `Desktop development with C++`
-- CMake
+- Visual Studio workload: `Desktop development with C++`
+- CMake 3.16+
 - Ninja
-- MSVC with C++20 support
+- MSVC `cl.exe`
 
-### Open In Visual Studio
+### Recommended
 
-推荐直接用 Visual Studio 打开项目文件夹：
+推荐直接用 Visual Studio 打开仓库根目录：
 
-1. 打开 Visual Studio
+1. 打开 Visual Studio 2022
 2. 选择 `File > Open > Folder`
-3. 打开项目根目录 `2D-Engine`
-4. 等待 CMake 自动配置
+3. 选择仓库根目录 `2D-Engine`
+4. 等待 CMake 配置完成
 
-### Build From Command Line
+### Command Line
+
+仓库当前只有 `configurePresets`，没有 `buildPresets`。  
+因此命令行构建应使用下面这组命令：
 
 ```powershell
 cmake --preset x64-debug
-cmake --build --preset x64-debug
+cmake --build out/build/x64-debug
 ```
 
-构建输出通常位于：
+Release 版本：
 
-```text
-out/build/x64-debug/
+```powershell
+cmake --preset x64-release
+cmake --build out/build/x64-release
 ```
 
-## Dependencies
+## Run Notes
 
-本项目通过源码子目录方式接入依赖，而不是手动配置属性页的 `include/lib` 路径。
+当前主线对运行目录和资源路径有要求，这一点需要提前知道：
 
-依赖位置：
+- `Renderer2D` 会尝试读取 `assets/shaders/Renderer2D_Quad.glsl`
+- 默认贴图搜索路径包括 `.`, `asset`, `asset/image`, `asset/image/siheyuan`
+- 当前仓库里可见的示例贴图主要是 `asset/image/siheyuan/pillar.png`
 
-- `external/SDL`
-- `external/SDL_image`
-- `external/imgui`
-- `external/json-develop`
+这意味着：
 
-这使得当前仓库更适合 CMake 工程和多人协作维护。
+- 如果工作目录不对，程序可能找不到资源
+- 如果 `assets/shaders/Renderer2D_Quad.glsl` 缺失，渲染初始化会失败
+- 当前仓库没有在 CMake 中自动复制资源目录到构建输出目录
 
-## Runtime Notes
+更稳的做法是：
 
-当前 `CMakeLists.txt` 已配置构建后自动复制：
+- 从仓库根目录启动程序，或
+- 手动确保构建输出目录能访问到 `asset/` 与 `assets/` 所需资源
 
-- `asset/`
-- `SDL3.dll`
-- `SDL3_image.dll`
+## Editor Workflow
 
-当前对象贴图路径仍是原型级字符串，例如：
+当前编辑器原型大致支持这条链路：
 
-```text
-test.png
-player.png
-enemy.png
-```
-
-如果运行目录缺少这些资源，纹理加载会失败。后续会进一步整理资源导入、资源目录和项目文件结构。
-
-## Roadmap
-
-下一阶段计划：
-
-1. 完善时间系统与固定更新循环
-2. 完善输入状态记录
-3. 引入碰撞系统与平台跳跃核心逻辑
-4. 扩展对象表示和资源管理
-5. 完成更完整的编辑器交互
-6. 实现项目保存 / 加载 / 导出闭环
-7. 完成平台跳跃样例 Demo
+1. 创建或打开项目
+2. 在 `Project` 面板导入文件或目录
+3. 资产写入项目目录并登记到 `asset_registry.json`
+4. 在 `Hierarchy` / `Scene` 中创建对象
+5. 在 `Inspector` 中编辑对象变换、贴图、脚本
+6. 在 `Scene` 面板直接拖拽资产到对象或空白区域
+7. 保存场景到项目目录
+8. 进入 `Play` 模式做最小运行验证
 
 ## Current Modules
 
-### Backend
+### Runtime
 
-- `WindowManager`：窗口初始化、销毁、分辨率调整、全屏切换
-- `Renderer2D`：遍历场景对象并渲染纹理
-- `InputManager`：处理 SDL 事件与基础快捷键
-- `ResourceManager`：按路径缓存纹理并统一释放
-- `GameLoop`：当前保留最小运行时更新逻辑
-- `SceneSerializer`：场景 JSON 保存与加载
+- `WindowManager`
+  负责 GLFW 窗口初始化、尺寸变化、全屏切换和 framebuffer 回调。
+- `RendererAPI / RenderCommand / Renderer`
+  提供图形 API 抽象与统一提交入口。
+- `Renderer2D`
+  负责 Quad 渲染、Scene 视口 FBO、相机更新和对象绘制。
+- `ResourceManager`
+  负责纹理路径解析、SDL 图像解码、OpenGL 纹理创建、缓存与释放。
+- `AssetRegistry`
+  负责资产登记、导入、项目资源同步、清单保存和路径索引。
+- `ProjectManager`
+  负责项目创建、打开，以及项目内文件的创建、删除、重命名、移动。
+- `ScriptRuntime`
+  负责 Windows 下原生脚本的编译、加载与执行。
+- `SceneSerializer`
+  负责场景 JSON 存取。
 
-### Frontend
+### Editor
 
-- `EditorUI`：整体 Docking 布局与顶层工具栏
-- `HierarchyPanel`：对象列表与对象选择
-- `ScenePanel`：场景概览、对象增删、属性重置、场景保存/加载
-- `InspectorPanel`：编辑位置、缩放和贴图路径
-- `AssetPanel`：原型级资源列表与贴图绑定
-- `ConsolePanel`：调试输出占位面板
+- `EditorUI`
+  负责 DockSpace、菜单栏、工具栏和整体布局。
+- `HierarchyPanel`
+  负责对象树与选择。
+- `ScenePanel`
+  负责 Scene 视口显示、拖拽放置、保存场景和对象编辑快捷操作。
+- `InspectorPanel`
+  负责对象属性、贴图绑定、脚本绑定。
+- `AssetPanel`
+  负责项目文件浏览、导入、创建、删除、重命名、移动、文本预览。
+- `ConsolePanel`
+  负责日志显示与筛选。
 
 ## Known Limitations
 
-当前版本仍然是原型，不应视为成熟引擎。主要限制包括：
+当前版本仍然有几个很实际的限制：
 
-- 运行时逻辑仍然非常简化
-- 尚未形成完整项目管理闭环
-- 尚未完成碰撞系统和 Demo 验证
-- 部分模块仍处于占位或过渡实现阶段
-- 构建脚本和工程结构仍会继续整理
+- 项目仍是原型，不是稳定成品
+- 运行时游戏逻辑还比较薄，`GameLoop` 还没有形成完整玩法层
+- 没有成熟的组件系统、碰撞系统、动画系统、音频系统
+- 渲染目前是基础 2D 提交链路，还没有批处理、图集、排序优化等完整性能方案
+- 原生脚本运行时目前是 Windows-first，并依赖本机 `cl.exe`
+- 部分资源与着色器路径仍需进一步整理
+- 当前仓库里 `assets/shaders/Renderer2D_Quad.glsl` 路径疑似缺失，需要补齐或修正路径
 
-## ResourceManager Update Notes
+## Roadmap
 
-This update fills out the resource-system foundation around `ResourceManager`.
+下一阶段更合理的推进方向是：
 
-Added files:
+1. 补齐并稳定 `assets/shaders` 等运行必需资源
+2. 整理渲染主链路，确保 Scene 视口与资源系统完全稳定
+3. 补齐对象/组件抽象，减少当前直接写字段的状态管理方式
+4. 完善项目工作流与资源导入闭环
+5. 增强脚本系统与运行时反馈
+6. 增加碰撞、平台跳跃逻辑与 Demo 场景验证
+7. 补性能统计、批处理和更完整的编辑器交互
 
-- `backend/resource/ResourcePathUtils.h`
-  Declares the path helper functions used by the resource layer. It is responsible for path normalization, building search roots, and resource path resolution.
-- `backend/resource/ResourcePathUtils.cpp`
-  Implements the filesystem lookup logic for resource resolution. It supports direct relative paths, absolute paths, and recursive fallback search inside configured resource folders.
-- `backend/resource/AssetRegistry.h`
-  Declares the editor-facing asset registry used to register imported assets with ID, name, type and path metadata.
-- `backend/resource/AssetRegistry.cpp`
-  Implements project-style asset import, file copying, manifest persistence, recursive folder import, asset type detection, de-duplication by path and runtime lookup by resource ID or path.
+## Notes
 
-Current `ResourceManager` responsibilities:
+如果你要对外描述这个项目，当前最准确的表述是：
 
-- texture loading
-- cache reuse by resolved file path
-- lookup by original identifier or resolved path
-- explicit single-texture release and full-cache release
-- renderer binding for repeated texture creation
-- search-path management
-- last-error reporting for failed resource operations
-
-Default search behavior:
-
-- current working directory
-- `asset`
-- `asset/image`
-- runtime-added path in `Engine`: `asset/image/siheyuan`
-
-Current asset import workflow:
-
-- import image files or a folder from the editor's `Project` panel
-- copy imported resources into the project asset library under `asset/imported`
-- persist registered assets into `asset/asset_registry.json`
-- reload the registry automatically on the next engine startup
-- register each asset with resource ID, name, type, source path and relative path
-- assign registered texture resources to scene objects through `textureResourceId`
-
-## Development Philosophy
-
-这个项目当前优先保证：
-
-- 主链路先跑通
-- 模块边界先明确
-- 架构方向先稳定
-- 之后再逐步补功能、补工具、补交付
-
-所以仓库中的某些实现会明显偏“原型化”，这是当前开发策略的一部分。
+`一个基于 C++、OpenGL 和 Dear ImGui 的轻量级 2D 引擎与可视化编辑器原型，包含渲染抽象层、Scene 视口、项目管理、资源导入、场景序列化和脚本运行时雏形。`
